@@ -1,22 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-const defaultIcon = L.icon({
-  iconUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-L.Marker.prototype.options.icon = defaultIcon;
 
 export interface MapItem {
   id: string;
@@ -24,6 +11,14 @@ export interface MapItem {
   lat: number;
   lng: number;
   status: string;
+  neighborhood?: string;
+}
+
+interface Cluster {
+  key: string;
+  lat: number;
+  lng: number;
+  items: MapItem[];
 }
 
 interface MapProps {
@@ -33,13 +28,45 @@ interface MapProps {
   height?: string;
 }
 
+const SANTIAGO_CENTRO: [number, number] = [-33.4430, -70.6503];
+
+function buildClusterIcon(count: number): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:#16a34a;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${count}</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -20],
+  });
+}
+
+function clusterItems(items: MapItem[]): Cluster[] {
+  const clusterMap = new globalThis.Map<string, Cluster>();
+
+  for (const item of items) {
+    const roundedLat = Math.round(item.lat * 1000) / 1000;
+    const roundedLng = Math.round(item.lng * 1000) / 1000;
+    const key = `${roundedLat},${roundedLng}`;
+
+    const existing = clusterMap.get(key);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      clusterMap.set(key, { key, lat: roundedLat, lng: roundedLng, items: [item] });
+    }
+  }
+
+  return Array.from(clusterMap.values());
+}
+
 export default function Map(props: MapProps) {
-  const { items, center, zoom = 13, height = "500px" } = props;
+  const { items, center, zoom = 14, height = "500px" } = props;
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const check = () =>
+    const check = (): void => {
       setIsDark(document.documentElement.classList.contains("dark"));
+    };
     check();
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, {
@@ -49,13 +76,22 @@ export default function Map(props: MapProps) {
     return () => observer.disconnect();
   }, []);
 
-  const mapCenter: [number, number] =
-    center ??
-    (items.length > 0 ? [items[0].lat, items[0].lng] : [-33.4, -70.6]);
-
-  const validItems = items.filter(
-    (item) => typeof item.lat === "number" && typeof item.lng === "number"
+  const validItems = useMemo(
+    () =>
+      items.filter(
+        (item) => typeof item.lat === "number" && typeof item.lng === "number"
+      ),
+    [items]
   );
+
+  const clusters = useMemo(() => clusterItems(validItems), [validItems]);
+
+  const mapCenter: [number, number] =
+    center ?? (validItems.length > 0 ? [validItems[0].lat, validItems[0].lng] : SANTIAGO_CENTRO);
+
+  const tileUrl = isDark
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
     <div
@@ -70,26 +106,27 @@ export default function Map(props: MapProps) {
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url={
-            isDark
-              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          }
+          url={tileUrl}
         />
-        {validItems.map((item) => (
-          <Marker key={item.id} position={[item.lat, item.lng]}>
+        {clusters.map((cluster) => (
+          <Marker
+            key={cluster.key}
+            position={[cluster.lat, cluster.lng]}
+            icon={buildClusterIcon(cluster.items.length)}
+          >
             <Popup>
-              <div className="min-w-[120px] space-y-1">
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-xs capitalize text-muted-foreground">
-                  {item.status}
-                </p>
-                <a
-                  href={`/items/${item.id}`}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Ver detalle
-                </a>
+              <div className="min-w-[160px] space-y-2">
+                {cluster.items.map((item) => (
+                  <div key={item.id} className="space-y-0.5">
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <a
+                      href={`/items/${item.id}`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Ver detalle
+                    </a>
+                  </div>
+                ))}
               </div>
             </Popup>
           </Marker>

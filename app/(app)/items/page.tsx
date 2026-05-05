@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Search, Filter, X, Loader2 } from "lucide-react";
 import { ItemCard } from "@/components/item-card";
@@ -9,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { CATEGORIES, CITIES } from "@/lib/data";
 import type { Item } from "@/lib/types";
+import type { MapItem } from "@/components/map";
+
+const Map = dynamic(() => import("@/components/map"), { ssr: false });
 
 export default function ItemsPage() {
   const [search, setSearch] = useState("");
@@ -179,6 +183,34 @@ export default function ItemsPage() {
           </div>
         )}
       </div>
+
+      {(() => {
+        const mapItems: MapItem[] = items
+          .filter((item) => item.status === "available")
+          .flatMap((item) => {
+            const lat = parseFloat(item.lat ?? "");
+            const lng = parseFloat(item.lng ?? "");
+            if (isNaN(lat) || isNaN(lng)) return [];
+            return [
+              {
+                id: String(item.id),
+                title: item.title,
+                lat,
+                lng,
+                status: item.status,
+                neighborhood: item.neighborhood ?? undefined,
+              },
+            ];
+          });
+        return (
+          <div className="mb-6">
+            <p className="mb-2 text-sm font-medium text-muted-foreground">
+              Items disponibles en el mapa
+            </p>
+            <Map items={mapItems} height="380px" center={[-33.4430, -70.6503]} zoom={14} />
+          </div>
+        );
+      })()}
 
       {filtered.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
