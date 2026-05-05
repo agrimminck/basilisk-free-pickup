@@ -1,13 +1,14 @@
 # Basilisk Free Pickup — Overview
 
 **Path:** `/home/agrim/github/idyllic/repos/basilisk-free-pickup`
-**Creado:** 2026-05-02. **Estado:** MVP — pendiente R2, pagos, geolocalización.
+**Estado:** MVP funcional — pendiente R2, pagos reales, geolocalización avanzada.
+**Deploy prod:** https://basilisk-free-pickup.vercel.app
 
 ---
 
 ## Propósito
 
-Conectar donantes (quieren regalar items) con fleteros (camioneros que los retiran). Modelo: fleteros pagan suscripción por leads, donantes reciben storage de fotos gratis (pueden pagar costo R2 por más).
+Conectar donantes (quieren regalar items) con fleteros (camioneros que los retiran) y clientes (reciben cosas directamente). Modelo token: 3 matches gratis/mes → pagan tokens adicionales. Donantes reciben storage fotos gratis (R2 pendiente).
 
 ---
 
@@ -18,9 +19,10 @@ Conectar donantes (quieren regalar items) con fleteros (camioneros que los retir
 | Framework | Next.js 16 App Router |
 | Lenguaje | TypeScript |
 | Styling | Tailwind CSS v4 (`@theme` en CSS, sin `tailwind.config.ts`) |
-| Auth | Better Auth (email + Google OAuth) |
+| Auth | Better Auth v1.2.x (email + Google OAuth) |
 | DB | Neon PostgreSQL — schema `free_pickup` |
 | ORM | Drizzle |
+| Mapa | Leaflet + React Leaflet (dynamic import, ssr:false) |
 | Deploy | Vercel |
 | Puerto dev | 3007 |
 
@@ -38,41 +40,149 @@ Conectar donantes (quieren regalar items) con fleteros (camioneros que los retir
 |-------|-------------|
 | `user` | Better Auth — usuarios |
 | `session` | Better Auth — sesiones |
-| `account` | Better Auth — credenciales |
+| `account` | Better Auth — credenciales (password: `salt:hash` scrypt N=16384 r=16 p=1 dkLen=64) |
 | `verification` | Better Auth — verificaciones |
-| `profiles` | id, user_id, role (donante/fletero), full_name, phone, storage_used_bytes, storage_limit_bytes, company_name, truck_capacity_m3 |
-| `items` | id, donante_id, title, description, category, status, address, neighborhood, city, lat, lng, reserved_by_fleeter_id |
-| `item_photos` | id, item_id, r2_key, r2_url, size_bytes |
-| `fleeter_subscriptions` | id, fleeter_id, plan, leads_limit, leads_used, current_period_start, current_period_end, active |
-| `donante_storage_payments` | id, donante_id, bytes_purchased, amount_paid_cents |
+| `profiles` | id, user_id, role, full_name, phone, tokens_balance, free_matches_used, free_matches_reset_at, average_rating |
+| `items` | id, donante_id, title, description, category, item_type, price, status, address, neighborhood, city, lat, lng, reserved_by_fleeter_id |
+| `item_photos` | id, item_id, r2_key, r2_url, size_bytes — **pendiente R2** (seed usa picsum.photos) |
+| `matches` | id, requester_id, recipient_id, item_id, match_type, status, token_cost |
+| `reviews` | id, match_id, reviewer_id, reviewee_id, rating, comment |
+| `token_transactions` | id, profile_id, amount, transaction_type, description, match_id |
+| `token_purchases` | id, profile_id, amount_paid_cents, tokens_purchased, status, preference_id, mp_payment_id, mp_init_point |
 
 ### Enums
 
 | Enum | Valores |
 |------|---------|
-| `role` | `donante`, `fletero` |
+| `role` | `donante`, `fletero`, `cliente` |
 | `item_category` | `muebles`, `electrodomesticos`, `ropa`, `electronica`, `juguetes`, `libros`, `otros` |
 | `item_status` | `available`, `reserved`, `picked_up` |
-| `subscription_plan` | `basic`, `premium`, `unlimited` |
+| `item_type` | `donation`, `sale` |
+| `match_type` | `donante_fletero`, `cliente_cliente` |
+| `match_status` | `pending`, `confirmed`, `completed`, `cancelled` |
+| `token_transaction_type` | `purchase`, `match_spend`, `free_match`, `refund`, `bonus` |
+| `token_purchase_status` | `pending`, `completed`, `failed` |
 
-**Importante schema:** tablas en schema `free_pickup` — NO en `public`. Usar siempre `pgSchema("free_pickup")` en Drizzle.
+**Pitfall schema:** `drizzle-kit push` con `?schema=free_pickup` NO crea schema automáticamente. Solución: `CREATE SCHEMA IF NOT EXISTS free_pickup` via psql antes.
+
+**Pitfall tsconfig:** `scripts/` excluido del build TypeScript en `tsconfig.json` — necesario para que Vercel no type-check los seeds.
 
 ---
 
 ## Variables de entorno
 
 ```bash
-# .env.local
 DATABASE_URL=postgresql://neondb_owner:<pw>@ep-muddy-forest-acsgvbxh.sa-east-1.aws.neon.tech/neondb?schema=free_pickup&sslmode=require
 BETTER_AUTH_SECRET=<generado>
-BETTER_AUTH_URL=http://localhost:3007          # producción: https://basilisk-free-pickup.vercel.app
-NEXT_PUBLIC_APP_URL=http://localhost:3007
-CLOUDFLARE_R2_ACCOUNT_ID=                      # pendiente
-CLOUDFLARE_R2_ACCESS_KEY_ID=                   # pendiente
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=               # pendiente
+BETTER_AUTH_URL=https://basilisk-free-pickup.vercel.app   # prod; localhost:3007 en dev
+NEXT_PUBLIC_APP_URL=https://basilisk-free-pickup.vercel.app
+GOOGLE_CLIENT_ID=                      # opcional
+GOOGLE_CLIENT_SECRET=                  # opcional
+MERCADOPAGO_ACCESS_TOKEN=              # pendiente
+MERCADOPAGO_PUBLIC_KEY=                # pendiente
+# R2 — pendiente:
+CLOUDFLARE_R2_ACCOUNT_ID=
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
 CLOUDFLARE_R2_BUCKET_NAME=free-pickup
-NEXT_PUBLIC_R2_PUBLIC_URL=                     # pendiente
+NEXT_PUBLIC_R2_PUBLIC_URL=
 ```
+
+Todas las vars de prod están configuradas en Vercel (encriptadas).
+
+---
+
+## Rutas
+
+| Ruta | Tipo | Descripción |
+|------|------|-------------|
+| `/` | público | landing page |
+| `/items` | auth | grid items con filtros + mapa interactivo |
+| `/items/new` | auth | crear item + upload fotos |
+| `/items/[id]` | auth | detalle item |
+| `/matches` | auth | lista mis matches |
+| `/matches/[id]/review` | auth | dejar review post-match completado |
+| `/reviews` | auth | mis reviews recibidas |
+| `/dashboard` | auth | stats: tokens, matches, items, rating |
+| `/tokens` | auth | comprar tokens (MercadoPago) |
+| `/api/auth/[...all]` | handler | Better Auth |
+| `/api/items` | GET/POST | listar items (mine=true filtra propios) / crear |
+| `/api/items/[id]` | GET/PUT/DELETE | detalle / actualizar / eliminar |
+| `/api/matches` | GET/POST | listar matches / crear match |
+| `/api/matches/[id]` | GET | detalle match |
+| `/api/matches/[id]/confirm` | POST | confirmar match |
+| `/api/matches/[id]/complete` | POST | completar match |
+| `/api/profile` | GET/PUT | perfil usuario auth |
+| `/api/reviews` | GET/POST | reviews del usuario / crear review |
+| `/api/tokens/balance` | GET | balance tokens + free matches |
+| `/api/tokens/purchase` | POST | iniciar compra MercadoPago |
+| `/api/tokens/purchase/status` | GET | estado compra |
+| `/api/tokens/webhook` | POST | webhook MercadoPago |
+| `/api/user/me` | GET | info usuario actual |
+
+---
+
+## Mapa interactivo
+
+`components/map.tsx` — Leaflet con clusters por ubicación.
+
+- **Clustering:** agrupa items por lat/lng redondeado a 3 decimales (~100m radio)
+- **Marcadores:** `L.divIcon` círculo verde `#16a34a`, número blanco = cantidad items en cluster
+- **Solo muestra `available`** — items reservados/retirados no aparecen
+- **Dark mode:** tile alternativo CartoDB dark
+- **Import:** siempre dynamic con `ssr: false` (Leaflet usa `window`)
+
+```tsx
+const Map = dynamic(() => import("@/components/map"), { ssr: false });
+```
+
+Ubicado en `/items` page sobre la grilla de items.
+
+---
+
+## Seed — cuentas de testeo
+
+Script: `scripts/seed.ts` — ejecutar con `npx tsx scripts/seed.ts`
+
+**Borra** todo en orden FK-safe antes de insertar. **Todos los items en Santiago Centro.**
+
+| Email | Password | Rol | Descripción |
+|-------|----------|-----|-------------|
+| agrim@test.com | test123 | donante | cuenta principal demo |
+| maria@test.com | test123 | donante | publicó 5 items |
+| jorge@test.com | test123 | fletero | pedidos confirmados + completados |
+| lucia@test.com | test123 | donante | le dio mesa a agrim |
+| pedro@test.com | test123 | donante | le dio refrigerador a agrim |
+
+**Items seeded (12 total, Santiago Centro):**
+
+| Barrio | Items | Cluster count en mapa |
+|--------|-------|----------------------|
+| Plaza de Armas | Sofá + Sillón + Bicicleta | 3 |
+| Barrio Lastarria | Libros + Microondas | 2 |
+| Barrio Italia | Sillas jardín (+ Caja ropa picked_up) | 1 |
+| Barrio República | Lavadora (reserved) + Mesa (picked_up) | 0 — no aparece |
+| Barrio Yungay | TV (reserved) + Refrigerador (picked_up) | 0 — no aparece |
+| Concha y Toro | Juguetes (picked_up) | 0 — no aparece |
+
+**Matches seeded (6):**
+- jorge→agrim (Lavadora): confirmed
+- jorge→agrim (Caja ropa): completed
+- agrim→lucia (Mesa comedor): completed
+- agrim→pedro (Refrigerador): completed
+- jorge→maria (TV 32): confirmed
+- jorge→maria (Juguetes): completed
+
+**Reviews seeded (8):** en los 4 matches completed, bidireccionales.
+
+---
+
+## Modelo tokens
+
+- 3 matches gratis/mes (`FREE_MATCHES_PER_MONTH` en `lib/data.ts`)
+- Cada match adicional = 1 token
+- Precio token: definido en `TOKEN_PRICE_CLP` en `lib/data.ts`
+- Compra vía MercadoPago (webhook en `/api/tokens/webhook`)
 
 ---
 
@@ -92,53 +202,17 @@ npm run dev  # http://localhost:3007
 ```bash
 npm run db:generate    # drizzle-kit generate
 npm run db:migrate     # drizzle-kit migrate
-npm run db:push        # drizzle-kit push (requiere DATABASE_URL)
+npm run db:push        # drizzle-kit push
 npm run db:studio      # drizzle-kit studio
+npx tsx scripts/seed.ts  # seed prod (borra y re-inserta todo)
 ```
-
-**Pitfall schema:** `drizzle-kit push` con `?schema=free_pickup` en URL NO crea tablas en ese schema automáticamente. Solución: usar `pgSchema("free_pickup")` en schema files + crear schema primero con `CREATE SCHEMA IF NOT EXISTS free_pickup` via psql directo.
-
----
-
-## Rutas
-
-| Ruta | Tipo | Descripción |
-|------|------|-------------|
-| `/` | público | landing page |
-| `/items` | público | grid items con filtros |
-| `/items/new` | donante | crear item + upload fotos |
-| `/items/[id]` | público | detalle item |
-| `/dashboard` | auth | role-aware: donante → items + storage, fletero → suscripciones + leads |
-| `/api/auth/[...all]` | handler | Better Auth |
-
----
-
-## Componentes
-
-| Componente | Ubicación | Descripción |
-|------------|-----------|-------------|
-| `navbar` | `components/` | navegación principal, auth-aware |
-| `item-card` | `components/` | card item en grid |
-| `photo-upload` | `components/` | upload fotos (pendiente R2) |
-| `storage-indicator` | `components/` | indicador storage donante |
-| `login-form` | `components/auth/` | formulario login |
-| `register-form` | `components/auth/` | formulario registro con selector rol |
-| UI primitives | `components/ui/` | button, card, input, textarea, select, badge, dialog |
-
----
-
-## Deploy
-
-- **URL producción:** https://basilisk-free-pickup.vercel.app (pendiente configurar)
-- **Proyecto Vercel:** `agrimmincks-projects/basilisk-free-pickup` (pendiente crear)
 
 ---
 
 ## Pendiente
 
-- **R2 integration:** configurar bucket `free-pickup`, presigned URLs, upload en `photo-upload`, storage en `item_photos`
-- **Pagos:** integrar pasarela (MercadoPago/Stripe) para suscripciones fleteros + storage extra donantes
-- **Geolocalización:** mapa items, filtro por distancia, cálculo rutas fleteros
-- **Cuentas test:** crear seed script con donantes + fleteros + items de prueba
-- **Consolidar `lib/db.ts` y `lib/db/index.ts`** — duplicados
-- **Unificar convención schema:** `lib/schema.ts` usa `pgSchema("free_pickup")`, `lib/db/schema.ts` usa `pgTable` sin schema — elegir uno
+- **R2 integration:** bucket `free-pickup`, presigned URLs, upload en `photo-upload`, storage en `item_photos`
+- **Pagos reales:** MercadoPago access token prod → suscripciones tokens
+- **Geolocalización avanzada:** filtro por distancia, rutas fleteros
+- **Google OAuth:** configurar redirect URIs en Google Console para prod
+- **Consolidar `lib/db.ts` y `lib/db/index.ts`** — posibles duplicados
