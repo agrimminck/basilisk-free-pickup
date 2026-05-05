@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Filter, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Search, Filter, X, Loader2 } from "lucide-react";
 import { ItemCard } from "@/components/item-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { MOCK_ITEMS, CATEGORIES, CITIES } from "@/lib/data";
+import { CATEGORIES, CITIES } from "@/lib/data";
+import type { Item } from "@/lib/types";
 
 export default function ItemsPage() {
   const [search, setSearch] = useState("");
@@ -14,27 +16,68 @@ export default function ItemsPage() {
   const [city, setCity] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [showFilters, setShowFilters] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = MOCK_ITEMS.filter((item) => {
-    const matchSearch =
-      !search ||
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.description.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = !category || item.category === category;
-    const matchCity = !city || item.city === city;
-    return matchSearch && matchCategory && matchCity;
-  }).sort((a, b) => {
-    if (sortBy === "recent") {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  useEffect(() => {
+    async function loadItems() {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch("/api/items");
+        if (!res.ok) throw new Error("Error cargando items");
+        const data = (await res.json()) as Item[];
+        setItems(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error desconocido");
+      } finally {
+        setLoading(false);
+      }
     }
-    return a.title.localeCompare(b.title);
-  });
+    loadItems();
+  }, []);
+
+  const filtered = items
+    .filter((item) => {
+      const matchSearch =
+        !search ||
+        item.title.toLowerCase().includes(search.toLowerCase()) ||
+        item.description.toLowerCase().includes(search.toLowerCase());
+      const matchCategory =
+        !category || item.category === category.toLowerCase();
+      const matchCity = !city || item.city === city;
+      return matchSearch && matchCategory && matchCity;
+    })
+    .sort((a, b) => {
+      if (sortBy === "recent") {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+      return a.title.localeCompare(b.title);
+    });
 
   const hasActiveFilters = search || category || city;
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-12 text-center">
+        <p className="text-lg text-red-500">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-8">
-      {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Items disponibles</h1>
@@ -43,12 +86,11 @@ export default function ItemsPage() {
             {filtered.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button className="w-full sm:w-auto gap-2">
-          Publicar item
-        </Button>
+        <Link href="/items/new">
+          <Button className="w-full sm:w-auto gap-2">Publicar item</Button>
+        </Link>
       </div>
 
-      {/* Search and filters */}
       <div className="mb-6 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -77,7 +119,10 @@ export default function ItemsPage() {
               <label className="mb-1.5 block text-sm font-medium">
                 Categoria
               </label>
-              <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <Select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
                 <option value="">Todas</option>
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -105,7 +150,10 @@ export default function ItemsPage() {
               <label className="mb-1.5 block text-sm font-medium">
                 Ordenar por
               </label>
-              <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
                 <option value="recent">Mas recientes</option>
                 <option value="alpha">A-Z</option>
               </Select>
@@ -132,11 +180,10 @@ export default function ItemsPage() {
         )}
       </div>
 
-      {/* Items grid */}
       {filtered.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} userRole="fletero" />
+            <ItemCard key={item.id} item={item} />
           ))}
         </div>
       ) : (

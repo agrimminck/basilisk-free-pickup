@@ -1,5 +1,4 @@
-import { Navbar } from "@/components/navbar";
-import { MOCK_USER_FLETERO } from "@/lib/data";
+import { NavbarWrapper } from "@/components/navbar-wrapper";
 
 export default function AppLayout({
   children,
@@ -8,10 +7,7 @@ export default function AppLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar
-        userRole={MOCK_USER_FLETERO.role}
-        userName={MOCK_USER_FLETERO.name}
-      />
+      <NavbarWrapper />
       <main className="flex-1">{children}</main>
     </div>
   );

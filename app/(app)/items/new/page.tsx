@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, X, MapPin, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
-import { CATEGORIES, CITIES } from "@/lib/data";
+import { Upload, X, MapPin, AlertCircle, Loader2 } from "lucide-react";
+import { Button } from "../../../../components/ui/button";
+import { Input } from "../../../../components/ui/input";
+import { Textarea } from "../../../../components/ui/textarea";
+import { Select } from "../../../../components/ui/select";
+import { CATEGORIES, CITIES } from "../../../../lib/data";
 
 const MAX_PHOTOS = 5;
 const STORAGE_USED = 3;
@@ -16,6 +16,8 @@ const STORAGE_LIMIT = 10;
 export default function NewItemPage() {
   const router = useRouter();
   const [photos, setPhotos] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -23,6 +25,8 @@ export default function NewItemPage() {
     address: "",
     neighborhood: "",
     city: "",
+    itemType: "donation" as "donation" | "sale",
+    price: "",
   });
 
   const storagePercent = (STORAGE_USED / STORAGE_LIMIT) * 100;
@@ -43,9 +47,39 @@ export default function NewItemPage() {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/items");
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          address: formData.address,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          itemType: formData.itemType,
+          price:
+            formData.itemType === "sale"
+              ? Number(formData.price) || 0
+              : undefined,
+          photos,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Error publicando item");
+      }
+      router.push("/items");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -178,6 +212,53 @@ export default function NewItemPage() {
           </Select>
         </div>
 
+        {/* Item type */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="itemType"
+              className="mb-1.5 block text-sm font-medium"
+            >
+              Tipo *
+            </label>
+            <Select
+              id="itemType"
+              value={formData.itemType}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  itemType: e.target.value as "donation" | "sale",
+                  price: e.target.value === "donation" ? "" : formData.price,
+                })
+              }
+              required
+            >
+              <option value="donation">Donacion</option>
+              <option value="sale">Venta</option>
+            </Select>
+          </div>
+          {formData.itemType === "sale" && (
+            <div>
+              <label
+                htmlFor="price"
+                className="mb-1.5 block text-sm font-medium"
+              >
+                Precio (CLP) *
+              </label>
+              <Input
+                id="price"
+                type="number"
+                placeholder="Ej: 50000"
+                value={formData.price}
+                onChange={(e) =>
+                  setFormData({ ...formData, price: e.target.value })
+                }
+                required={formData.itemType === "sale"}
+              />
+            </div>
+          )}
+        </div>
+
         {/* Location */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -247,6 +328,13 @@ export default function NewItemPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-red-500">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </div>
+        )}
+
         {/* Submit */}
         <div className="flex gap-3 pt-4">
           <Button
@@ -254,11 +342,16 @@ export default function NewItemPage() {
             variant="outline"
             className="flex-1"
             onClick={() => router.back()}
+            disabled={submitting}
           >
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Publicar item
+          <Button type="submit" className="flex-1" disabled={submitting}>
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Publicar item"
+            )}
           </Button>
         </div>
       </form>

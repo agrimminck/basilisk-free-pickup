@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { profiles, tokenPurchases } from "@/db/schema";
-import { addTokens, TOKEN_PRICE_CLP } from "@/lib/tokens";
+import { TOKEN_PRICE_CLP } from "@/lib/tokens";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -12,8 +14,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const body = (await request.json()) as { tokens: number };
-  if (!body.tokens || body.tokens < 1) {
+  const body = (await request.json().catch(() => null)) as {
+    tokens?: number;
+  } | null;
+  if (!body?.tokens || body.tokens < 1) {
     return NextResponse.json(
       { error: "Cantidad de tokens invalida" },
       { status: 400 }
@@ -24,7 +28,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     where: eq(profiles.userId, session.user.id),
   });
   if (!profile) {
-    return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Perfil no encontrado" },
+      { status: 404 }
+    );
   }
 
   const amountCents = body.tokens * TOKEN_PRICE_CLP * 100;
@@ -39,23 +46,82 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     })
     .returning();
 
-  // TODO: integrar pasarela de pagos (MercadoPago/Stripe)
-  // Por ahora completamos directamente para pruebas
-  await db
-    .update(tokenPurchases)
-    .set({ status: "completed" })
-    .where(eq(tokenPurchases.id, purchase.id));
+  const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!mpAccessToken) {
+    return NextResponse.json(
+      { error: "MercadoPago no configurado" },
+      { status: 500 }
+    );
+  }
 
-  await addTokens(
-    profile.id,
-    body.tokens,
-    `Compra de ${body.tokens} tokens (ID: ${purchase.id})`
-  );
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3007";
+  const webhookUrl = `${baseUrl}/api/tokens/webhook`;
 
-  return NextResponse.json({
-    purchaseId: purchase.id,
-    tokens: body.tokens,
-    amountCents,
-    status: "completed",
-  });
+  const preferencePayload = {
+    items: [
+      {
+        title: `${body.tokens} token${body.tokens > 1 ? "s" : ""} FreePickup`,
+        quantity: 1,
+        unit_price: body.tokens * TOKEN_PRICE_CLP,
+        currency_id: "CLP",
+      },
+    ],
+    external_reference: String(purchase.id),
+    back_urls: {
+      success: `${baseUrl}/tokens?status=success`,
+      failure: `${baseUrl}/tokens?status=failure`,
+      pending: `${baseUrl}/tokens?status=pending`,
+    },
+    auto_return: "approved",
+    notification_url: webhookUrl,
+  };
+
+  try {
+    const mpRes = await fetch(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${mpAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(preferencePayload),
+      }
+    );
+
+    if (!mpRes.ok) {
+      const errText = await mpRes.text();
+      throw new Error(`MP error: ${errText}`);
+    }
+
+    const mpData = (await mpRes.json()) as {
+      id: string;
+      init_point: string;
+      sandbox_init_point?: string;
+    };
+
+    await db
+      .update(tokenPurchases)
+      .set({
+        preferenceId: mpData.id,
+        mpInitPoint: mpData.init_point,
+      })
+      .where(eq(tokenPurchases.id, purchase.id));
+
+    return NextResponse.json({
+      initPoint: mpData.init_point,
+      purchaseId: purchase.id,
+    });
+  } catch (err: any) {
+    await db
+      .update(tokenPurchases)
+      .set({ status: "failed" })
+      .where(eq(tokenPurchases.id, purchase.id));
+
+    return NextResponse.json(
+      { error: err.message || "Error al crear preferencia de pago" },
+      { status: 500 }
+    );
+  }
 }

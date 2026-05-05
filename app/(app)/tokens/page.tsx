@@ -1,25 +1,76 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Coins, CreditCard, Minus, Plus, CheckCircle } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Coins,
+  CreditCard,
+  Minus,
+  Plus,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TOKEN_PRICE_CLP,
-  MOCK_USER_DONANTE,
   FREE_MATCHES_PER_MONTH,
 } from "@/lib/data";
+import type { TokenBalance, Profile } from "@/lib/types";
 
 const PRESET_AMOUNTS = [1, 3, 5, 10];
 
-export default function TokensPage() {
+function TokensPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [balance, setBalance] = useState<TokenBalance | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const status = searchParams.get("status");
 
   const totalCents = quantity * TOKEN_PRICE_CLP * 100;
   const totalFormatted = (quantity * TOKEN_PRICE_CLP).toLocaleString("es-CL");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [balanceRes, profileRes] = await Promise.all([
+          fetch("/api/tokens/balance"),
+          fetch("/api/profile"),
+        ]);
+        if (balanceRes.ok) {
+          const b = (await balanceRes.json()) as TokenBalance;
+          setBalance(b);
+        }
+        if (profileRes.ok) {
+          const p = (await profileRes.json()) as Profile;
+          setProfile(p);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setDataLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (status === "success") {
+      setStatusMessage("Pago aprobado. Verificando tu compra...");
+    } else if (status === "failure") {
+      setStatusMessage(
+        "El pago fue rechazado o cancelado. Intenta nuevamente."
+      );
+    } else if (status === "pending") {
+      setStatusMessage("Tu pago esta pendiente de confirmacion.");
+    }
+  }, [status]);
 
   const handlePurchase = async () => {
     setLoading(true);
@@ -29,25 +80,56 @@ export default function TokensPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tokens: quantity }),
       });
-      if (res.ok) {
-        setSuccess(true);
-        setTimeout(() => router.push("/dashboard"), 1500);
+      const data = await res.json();
+      if (res.ok && data.initPoint) {
+        window.location.href = data.initPoint;
       } else {
-        const data = await res.json();
-        alert(data.error ?? "Error al comprar tokens");
+        alert(data.error ?? "Error al iniciar el pago");
+        setLoading(false);
       }
-    } finally {
+    } catch {
+      alert("Error de red al iniciar el pago");
       setLoading(false);
     }
   };
 
-  if (success) {
+  if (status === "success") {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-20 text-center">
         <CheckCircle className="mb-4 h-16 w-16 text-green-500" />
-        <h1 className="text-2xl font-bold">Compra exitosa</h1>
+        <h1 className="text-2xl font-bold">Pago exitoso</h1>
         <p className="mt-2 text-muted-foreground">
-          Se agregaron {quantity} tokens a tu cuenta.
+          {statusMessage ?? "Tu compra fue procesada correctamente."}
+        </p>
+        <Button className="mt-6" onClick={() => router.push("/dashboard")}>
+          Ir al dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === "failure") {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-20 text-center">
+        <XCircle className="mb-4 h-16 w-16 text-red-500" />
+        <h1 className="text-2xl font-bold">Pago fallido</h1>
+        <p className="mt-2 text-muted-foreground">
+          {statusMessage ?? "No se pudo completar el pago."}
+        </p>
+        <Button className="mt-6" onClick={() => router.push("/tokens")}>
+          Intentar de nuevo
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center justify-center px-4 py-20 text-center">
+        <Clock className="mb-4 h-16 w-16 text-yellow-500" />
+        <h1 className="text-2xl font-bold">Pago pendiente</h1>
+        <p className="mt-2 text-muted-foreground">
+          {statusMessage ?? "Tu pago esta siendo procesado."}
         </p>
         <Button className="mt-6" onClick={() => router.push("/dashboard")}>
           Ir al dashboard
@@ -66,7 +148,7 @@ export default function TokensPage() {
       </div>
 
       <div className="rounded-lg border bg-card p-6">
-        {/* Current balance mock */}
+        {/* Current balance */}
         <div className="mb-6 flex items-center justify-between rounded-lg bg-primary/5 p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">
@@ -74,14 +156,23 @@ export default function TokensPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Tu balance</p>
-              <p className="text-xl font-bold">{MOCK_USER_DONANTE.tokensBalance} tokens</p>
+              <p className="text-xl font-bold">
+                {dataLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `${balance?.tokensBalance ?? 0} tokens`
+                )}
+              </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Gratis este mes</p>
             <p className="text-xl font-bold">
-              {Math.max(0, FREE_MATCHES_PER_MONTH - MOCK_USER_DONANTE.freeMatchesUsed)} /{" "}
-              {FREE_MATCHES_PER_MONTH}
+              {dataLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                `${Math.max(0, FREE_MATCHES_PER_MONTH - (balance?.freeMatchesUsed ?? 0))} / ${FREE_MATCHES_PER_MONTH}`
+              )}
             </p>
           </div>
         </div>
@@ -149,7 +240,9 @@ export default function TokensPage() {
           disabled={loading}
         >
           <CreditCard className="h-4 w-4" />
-          {loading ? "Procesando..." : `Pagar $${totalFormatted} CLP`}
+          {loading
+            ? "Redirigiendo a MercadoPago..."
+            : `Pagar $${totalFormatted} CLP`}
         </Button>
 
         <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -158,5 +251,21 @@ export default function TokensPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function TokensPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-2xl px-4 py-8">
+          <div className="rounded-lg border bg-card p-6">
+            <p className="text-center text-muted-foreground">Cargando...</p>
+          </div>
+        </div>
+      }
+    >
+      <TokensPageInner />
+    </Suspense>
   );
 }

@@ -16,15 +16,19 @@ import {
   LogOut,
   User,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { cn } from "../lib/utils";
+import { authClient } from "../lib/auth-client";
 
 interface NavbarProps {
-  userRole?: "donante" | "fletero" | "cliente";
-  userName?: string;
+  user?: {
+    name: string;
+    image?: string;
+    role: "donante" | "fletero" | "cliente";
+  };
 }
 
-export function Navbar({ userRole, userName }: NavbarProps) {
+export function Navbar({ user }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const pathname = usePathname();
@@ -47,7 +51,7 @@ export function Navbar({ userRole, userName }: NavbarProps) {
     },
   ];
 
-  if (userRole === "donante" || userRole === "cliente") {
+  if (user?.role === "donante" || user?.role === "cliente") {
     navLinks.push({
       href: "/items/new",
       label: "Publicar",
@@ -101,16 +105,28 @@ export function Navbar({ userRole, userName }: NavbarProps) {
             )}
           </Button>
 
-          {userName ? (
+          {user ? (
             <div className="hidden md:flex items-center gap-2">
               <div className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm">
-                <User className="h-4 w-4" />
-                <span>{userName}</span>
-                {userRole === "fletero" && (
+                {user.image ? (
+                  <img
+                    src={user.image}
+                    alt={user.name}
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4" />
+                )}
+                <span>{user.name}</span>
+                {user.role === "fletero" && (
                   <Truck className="h-3.5 w-3.5 text-primary" />
                 )}
               </div>
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => authClient.signOut()}
+              >
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -163,13 +179,27 @@ export function Navbar({ userRole, userName }: NavbarProps) {
               );
             })}
 
-            {userName && (
+            {user && (
               <div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-2.5 text-sm">
-                <User className="h-4 w-4" />
-                <span>{userName}</span>
-                {userRole === "fletero" && (
+                {user.image ? (
+                  <img
+                    src={user.image}
+                    alt={user.name}
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4" />
+                )}
+                <span>{user.name}</span>
+                {user.role === "fletero" && (
                   <Truck className="h-3.5 w-3.5 text-primary" />
                 )}
+                <button
+                  onClick={() => authClient.signOut()}
+                  className="ml-auto"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             )}
           </nav>

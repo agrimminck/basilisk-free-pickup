@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DialogProps {
   open: boolean;
@@ -55,7 +56,7 @@ function DialogOverlay({ children }: { children?: React.ReactNode }) {
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/80"
+        className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0"
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
@@ -66,7 +67,7 @@ function DialogOverlay({ children }: { children?: React.ReactNode }) {
 
 function DialogContent({
   children,
-  className = "",
+  className,
   ...props
 }: DialogContentProps) {
   const { open, onOpenChange } = React.useContext(DialogContext);
@@ -77,7 +78,10 @@ function DialogContent({
     <DialogOverlay>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className={`relative w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg sm:max-w-xl ${className}`}
+          className={cn(
+            "relative w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg sm:max-w-xl",
+            className
+          )}
           role="dialog"
           aria-modal="true"
           {...props}
@@ -98,47 +102,59 @@ function DialogContent({
 }
 
 function DialogHeader({
-  className = "",
+  className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`flex flex-col space-y-1.5 text-center sm:text-left ${className}`}
+      className={cn(
+        "flex flex-col space-y-1.5 text-center sm:text-left",
+        className
+      )}
       {...props}
     />
   );
 }
 
 function DialogFooter({
-  className = "",
+  className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 ${className}`}
+      className={cn(
+        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+        className
+      )}
       {...props}
     />
   );
 }
 
 function DialogTitle({
-  className = "",
+  className,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={`text-lg font-semibold leading-none tracking-tight ${className}`}
+      className={cn(
+        "text-lg font-semibold leading-none tracking-tight",
+        className
+      )}
       {...props}
     />
   );
 }
 
 function DialogDescription({
-  className = "",
+  className,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={`text-sm text-muted-foreground ${className}`} {...props} />
+    <p
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
   );
 }
 

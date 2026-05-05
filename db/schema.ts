@@ -207,7 +207,11 @@ export const tokenPurchases = freePickup.table("token_purchases", {
   amountCents: integer("amount_paid_cents").notNull(),
   tokensPurchased: integer("tokens_purchased").notNull(),
   status: tokenPurchaseStatusEnum("status").notNull().default("pending"),
+  preferenceId: varchar("preference_id"),
+  mpPaymentId: varchar("mp_payment_id"),
+  mpInitPoint: varchar("mp_init_point"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Relations

@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { Item } from "@/lib/data";
 import { MapPin, Calendar, Truck } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { cn } from "../lib/utils";
+import type { Item } from "../lib/types";
 
 interface ItemCardProps {
   item: Item;
@@ -10,13 +13,13 @@ interface ItemCardProps {
 }
 
 export function ItemCard({ item, userRole }: ItemCardProps) {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     available: "bg-green-500/20 text-green-600 dark:text-green-400",
     reserved: "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400",
     picked_up: "bg-gray-500/20 text-gray-600 dark:text-gray-400",
   };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     available: "Disponible",
     reserved: "Reservado",
     picked_up: "Retirado",
@@ -25,7 +28,9 @@ export function ItemCard({ item, userRole }: ItemCardProps) {
   const timeAgo = (date: string) => {
     const now = new Date();
     const then = new Date(date);
-    const diff = Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60));
+    const diff = Math.floor(
+      (now.getTime() - then.getTime()) / (1000 * 60 * 60)
+    );
     if (diff < 1) return "Hace minutos";
     if (diff < 24) return `Hace ${diff}h`;
     const days = Math.floor(diff / 24);
@@ -37,7 +42,7 @@ export function ItemCard({ item, userRole }: ItemCardProps) {
       <Link href={`/items/${item.id}`}>
         <div className="aspect-video overflow-hidden bg-muted">
           <img
-            src={item.photos[0]}
+            src={item.photos[0]?.r2Url ?? ""}
             alt={item.title}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
@@ -74,6 +79,19 @@ export function ItemCard({ item, userRole }: ItemCardProps) {
             <Calendar className="h-3 w-3" />
             {timeAgo(item.createdAt)}
           </span>
+        </div>
+
+        <div className="mb-3 flex items-center gap-2">
+          <Badge
+            variant={item.itemType === "donation" ? "secondary" : "default"}
+          >
+            {item.itemType === "donation" ? "Donacion" : "Venta"}
+          </Badge>
+          {item.itemType === "sale" && item.price != null && (
+            <span className="text-sm font-semibold text-primary">
+              ${item.price.toLocaleString("es-CL")}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between">

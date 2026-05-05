@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -11,75 +11,127 @@ import {
   Plus,
   MessageSquare,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  MOCK_ITEMS,
-  MOCK_USER_DONANTE,
-  MOCK_USER_FLETERO,
-  MOCK_USER_CLIENTE,
-  MOCK_MATCHES,
-  MOCK_REVIEWS,
-  FREE_MATCHES_PER_MONTH,
-  TOKEN_PRICE_CLP,
-} from "@/lib/data";
+import { FREE_MATCHES_PER_MONTH, TOKEN_PRICE_CLP } from "@/lib/data";
 import { cn } from "@/lib/utils";
-
-type UserRole = "donante" | "fletero" | "cliente";
+import type {
+  Profile,
+  TokenBalance,
+  Match,
+  Review,
+  Item,
+} from "@/lib/types";
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<UserRole>("donante");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [balance, setBalance] = useState<TokenBalance | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [myItems, setMyItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const user =
-    role === "donante"
-      ? MOCK_USER_DONANTE
-      : role === "fletero"
-        ? MOCK_USER_FLETERO
-        : MOCK_USER_CLIENTE;
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const myItems = MOCK_ITEMS.filter((i) => i.donorId === user.id);
-  const userMatches = MOCK_MATCHES.filter(
-    (m) => m.requesterId === user.id || m.recipientId === user.id
-  );
-  const userReviews = MOCK_REVIEWS.filter((r) => r.revieweeId === user.id);
-  const completedMatches = userMatches.filter((m) => m.status === "completed");
-  const freeMatchesRemaining = Math.max(
-    0,
-    FREE_MATCHES_PER_MONTH - user.freeMatchesUsed
-  );
+        const [profileRes, balanceRes, matchesRes, reviewsRes, itemsRes] =
+          await Promise.all([
+            fetch("/api/profile"),
+            fetch("/api/tokens/balance"),
+            fetch("/api/matches"),
+            fetch("/api/reviews"),
+            fetch("/api/items?mine=true"),
+          ]);
+
+        if (profileRes.status === 401 || balanceRes.status === 401) {
+          setError("Debes iniciar sesion para ver tu dashboard.");
+          return;
+        }
+
+        if (!profileRes.ok) throw new Error("Error cargando perfil");
+        if (!balanceRes.ok) throw new Error("Error cargando balance");
+        if (!matchesRes.ok) throw new Error("Error cargando matches");
+        if (!reviewsRes.ok) throw new Error("Error cargando reviews");
+        if (!itemsRes.ok) throw new Error("Error cargando items");
+
+        const profileData = (await profileRes.json()) as Profile;
+        const balanceData = (await balanceRes.json()) as TokenBalance;
+        const matchesData = (await matchesRes.json()) as Match[];
+        const reviewsData = (await reviewsRes.json()) as Review[];
+        const itemsData = (await itemsRes.json()) as Item[];
+
+        setProfile(profileData);
+        setBalance(balanceData);
+        setMatches(matchesData);
+        setReviews(reviewsData);
+        setMyItems(itemsData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error desconocido");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-12 text-center">
+        <p className="text-lg text-red-500">{error}</p>
+        <Link href="/login">
+          <Button className="mt-4">Iniciar sesion</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!profile || !balance) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-12 text-center">
+        <p className="text-muted-foreground">No se pudo cargar el dashboard.</p>
+      </div>
+    );
+  }
+
+  const completedMatches = matches.filter((m) => m.status === "completed");
+  const freeMatchesRemaining = balance.freeMatchesRemaining;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-8">
-      {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Dashboard</h1>
-          <p className="text-muted-foreground">Bienvenido, {user.name}</p>
+          <p className="text-muted-foreground">
+            Bienvenido, {profile.fullName}
+          </p>
         </div>
-        <div className="flex rounded-lg border bg-card p-1">
-          {(["donante", "fletero", "cliente"] as UserRole[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors",
-                role === r
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        <Link href="/tokens">
+          <Button size="sm" className="gap-1">
+            <Plus className="h-3.5 w-3.5" />
+            Comprar tokens
+          </Button>
+        </Link>
       </div>
 
-      {/* Stats */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Coins}
           label="Tokens disponibles"
-          value={user.tokensBalance}
+          value={balance.tokensBalance}
         />
         <StatCard
           icon={Handshake}
@@ -88,8 +140,12 @@ export default function DashboardPage() {
         />
         <StatCard
           icon={Package}
-          label={role === "fletero" ? "Items reservados" : "Mis items"}
-          value={role === "fletero" ? userMatches.length : myItems.length}
+          label={
+            profile.role === "fletero" ? "Items reservados" : "Mis items"
+          }
+          value={
+            profile.role === "fletero" ? matches.length : myItems.length
+          }
         />
         <StatCard
           icon={TrendingUp}
@@ -99,17 +155,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main column */}
         <div className="space-y-6 lg:col-span-2">
-          <TokensCard user={user} freeMatchesRemaining={freeMatchesRemaining} />
-          <MatchesCard matches={userMatches} />
-          {role !== "fletero" && <ItemsCard items={myItems} />}
+          <TokensCard
+            tokensBalance={balance.tokensBalance}
+            freeMatchesUsed={balance.freeMatchesUsed}
+            freeMatchesRemaining={freeMatchesRemaining}
+          />
+          <MatchesCard matches={matches} />
+          {profile.role !== "fletero" && <ItemsCard items={myItems} />}
         </div>
 
-        {/* Side column */}
         <div className="space-y-6">
-          <RatingCard rating={user.averageRating} reviewCount={userReviews.length} />
-          <ReviewsCard reviews={userReviews} />
+          <RatingCard
+            rating={
+              balance.averageRating
+                ? parseFloat(balance.averageRating)
+                : undefined
+            }
+            reviewCount={reviews.length}
+          />
+          <ReviewsCard reviews={reviews} />
         </div>
       </div>
     </div>
@@ -141,10 +206,12 @@ function StatCard({
 }
 
 function TokensCard({
-  user,
+  tokensBalance,
+  freeMatchesUsed,
   freeMatchesRemaining,
 }: {
-  user: { tokensBalance: number; freeMatchesUsed: number; name: string };
+  tokensBalance: number;
+  freeMatchesUsed: number;
   freeMatchesRemaining: number;
 }) {
   return (
@@ -160,12 +227,14 @@ function TokensCard({
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <p className="text-2xl font-bold">{user.tokensBalance}</p>
+          <p className="text-2xl font-bold">{tokensBalance}</p>
           <p className="text-sm text-muted-foreground">Tokens disponibles</p>
         </div>
         <div>
-          <p className="text-2xl font-bold">{user.freeMatchesUsed}</p>
-          <p className="text-sm text-muted-foreground">Matches gratis usados</p>
+          <p className="text-2xl font-bold">{freeMatchesUsed}</p>
+          <p className="text-sm text-muted-foreground">
+            Matches gratis usados
+          </p>
         </div>
         <div>
           <p className="text-2xl font-bold">{freeMatchesRemaining}</p>
@@ -174,13 +243,14 @@ function TokensCard({
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         Cada match cuesta 1 token. Todos los usuarios tienen{" "}
-        {FREE_MATCHES_PER_MONTH} matches gratis al mes. Precio: ${TOKEN_PRICE_CLP.toLocaleString("es-CL")} CLP por token.
+        {FREE_MATCHES_PER_MONTH} matches gratis al mes. Precio: $
+        {TOKEN_PRICE_CLP.toLocaleString("es-CL")} CLP por token.
       </p>
     </div>
   );
 }
 
-function MatchesCard({ matches }: { matches: typeof MOCK_MATCHES }) {
+function MatchesCard({ matches }: { matches: Match[] }) {
   const statusLabel: Record<string, string> = {
     pending: "Pendiente",
     confirmed: "Confirmado",
@@ -206,10 +276,11 @@ function MatchesCard({ matches }: { matches: typeof MOCK_MATCHES }) {
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
-                  {match.itemTitle ?? "Match directo"}
+                  {match.item?.title ?? "Match directo"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {match.requesterName} → {match.recipientName}
+                  {match.requester?.fullName ?? ""} →{" "}
+                  {match.recipient?.fullName ?? ""}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(match.createdAt).toLocaleDateString("es-CL")}
@@ -239,7 +310,7 @@ function MatchesCard({ matches }: { matches: typeof MOCK_MATCHES }) {
   );
 }
 
-function ItemsCard({ items }: { items: typeof MOCK_ITEMS }) {
+function ItemsCard({ items }: { items: Item[] }) {
   return (
     <div className="rounded-lg border bg-card p-4">
       <div className="mb-4 flex items-center justify-between">
@@ -260,7 +331,7 @@ function ItemsCard({ items }: { items: typeof MOCK_ITEMS }) {
               className="flex items-center gap-4 rounded-lg border p-3 transition-colors hover:bg-accent/50"
             >
               <img
-                src={item.photos[0]}
+                src={item.photos[0]?.r2Url ?? ""}
                 alt={item.title}
                 className="h-14 w-14 rounded-md object-cover"
               />
@@ -294,7 +365,9 @@ function ItemsCard({ items }: { items: typeof MOCK_ITEMS }) {
       ) : (
         <div className="py-8 text-center">
           <Package className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="text-muted-foreground">No has publicado items todavia</p>
+          <p className="text-muted-foreground">
+            No has publicado items todavia
+          </p>
           <Link href="/items/new">
             <Button className="mt-4 gap-1">
               <Plus className="h-4 w-4" />
@@ -332,14 +405,17 @@ function RatingCard({
   );
 }
 
-function ReviewsCard({ reviews }: { reviews: typeof MOCK_REVIEWS }) {
+function ReviewsCard({ reviews }: { reviews: Review[] }) {
   return (
     <div className="rounded-lg border bg-card p-4">
       <h2 className="mb-4 font-semibold">Reviews recientes</h2>
       {reviews.length > 0 ? (
         <div className="space-y-4">
           {reviews.slice(0, 3).map((review) => (
-            <div key={review.id} className="border-b pb-3 last:border-0 last:pb-0">
+            <div
+              key={review.id}
+              className="border-b pb-3 last:border-0 last:pb-0"
+            >
               <div className="mb-1 flex items-center gap-2">
                 <div className="flex items-center gap-0.5">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -358,7 +434,9 @@ function ReviewsCard({ reviews }: { reviews: typeof MOCK_REVIEWS }) {
                   {new Date(review.createdAt).toLocaleDateString("es-CL")}
                 </span>
               </div>
-              <p className="text-sm font-medium">{review.reviewerName}</p>
+              <p className="text-sm font-medium">
+                {review.reviewer?.fullName ?? ""}
+              </p>
               {review.comment && (
                 <p className="mt-1 text-sm text-muted-foreground">
                   {review.comment}

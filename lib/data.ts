@@ -271,6 +271,7 @@ export const MOCK_MATCHES: Match[] = [
     id: "m3",
     requesterId: "u3",
     recipientId: "u1",
+    itemId: "3",
     matchType: "cliente_cliente",
     status: "pending",
     tokenCost: 1,
