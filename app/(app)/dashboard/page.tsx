@@ -14,7 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FREE_MATCHES_PER_MONTH, TOKEN_PRICE_CLP } from "@/lib/data";
+import { FREE_MATCHES_PER_MONTH, TOKEN_PRICE_CLP } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 import type {
   Profile,
@@ -41,7 +41,7 @@ export default function DashboardPage() {
 
         const [profileRes, balanceRes, matchesRes, reviewsRes, itemsRes] =
           await Promise.all([
-            fetch("/api/profile"),
+            fetch("/api/user/me"),
             fetch("/api/tokens/balance"),
             fetch("/api/matches"),
             fetch("/api/reviews"),

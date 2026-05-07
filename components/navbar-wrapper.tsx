@@ -16,7 +16,7 @@ export function NavbarWrapper() {
       return;
     }
     setProfileLoading(true);
-    fetch("/api/profile")
+    fetch("/api/user/me")
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to fetch profile");
         const data = (await res.json()) as Profile;

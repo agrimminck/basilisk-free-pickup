@@ -8,7 +8,7 @@
 
 ## Propósito
 
-Conectar donantes (quieren regalar items) con fleteros (camioneros que los retiran) y clientes (reciben cosas directamente). Modelo token: 3 matches gratis/mes → pagan tokens adicionales. Donantes reciben storage fotos gratis (R2 pendiente).
+Conectar donantes (quieren regalar items) con fleteros (camioneros que los retiran) y clientes (reciben cosas directamente). Modelo token: 4 matches gratis/mes → pagan tokens adicionales. Donantes reciben storage fotos gratis (R2 pendiente).
 
 ---
 
@@ -78,8 +78,8 @@ BETTER_AUTH_URL=https://basilisk-free-pickup.vercel.app   # prod; localhost:3007
 NEXT_PUBLIC_APP_URL=https://basilisk-free-pickup.vercel.app
 GOOGLE_CLIENT_ID=                      # opcional
 GOOGLE_CLIENT_SECRET=                  # opcional
-MERCADOPAGO_ACCESS_TOKEN=              # pendiente
-MERCADOPAGO_PUBLIC_KEY=                # pendiente
+MERCADOPAGO_ACCESS_TOKEN=              # pendiente configurar en prod
+MERCADOPAGO_PUBLIC_KEY=                # pendiente configurar en prod
 # R2 — pendiente:
 CLOUDFLARE_R2_ACCOUNT_ID=
 CLOUDFLARE_R2_ACCESS_KEY_ID=
@@ -98,7 +98,7 @@ Todas las vars de prod están configuradas en Vercel (encriptadas).
 |------|------|-------------|
 | `/` | público | landing page |
 | `/items` | auth | grid items con filtros + mapa interactivo |
-| `/items/new` | auth | crear item + upload fotos |
+| `/items/new` | auth | crear item + upload fotos (placeholder sin R2) |
 | `/items/[id]` | auth | detalle item |
 | `/matches` | auth | lista mis matches |
 | `/matches/[id]/review` | auth | dejar review post-match completado |
@@ -112,13 +112,12 @@ Todas las vars de prod están configuradas en Vercel (encriptadas).
 | `/api/matches/[id]` | GET | detalle match |
 | `/api/matches/[id]/confirm` | POST | confirmar match |
 | `/api/matches/[id]/complete` | POST | completar match |
-| `/api/profile` | GET/PUT | perfil usuario auth |
 | `/api/reviews` | GET/POST | reviews del usuario / crear review |
 | `/api/tokens/balance` | GET | balance tokens + free matches |
 | `/api/tokens/purchase` | POST | iniciar compra MercadoPago |
 | `/api/tokens/purchase/status` | GET | estado compra |
 | `/api/tokens/webhook` | POST | webhook MercadoPago |
-| `/api/user/me` | GET | info usuario actual |
+| `/api/user/me` | GET | perfil usuario autenticado (canónico) |
 
 ---
 
@@ -144,7 +143,7 @@ Ubicado en `/items` page sobre la grilla de items.
 
 Script: `scripts/seed.ts` — ejecutar con `npx tsx scripts/seed.ts`
 
-**Borra** todo en orden FK-safe antes de insertar. **Todos los items en Santiago Centro.**
+**Borra** todo en orden FK-safe antes de insertar. **65 items en Santiago Centro, 13 usuarios, 30 barrios distintos.**
 
 | Email | Password | Rol | Descripción |
 |-------|----------|-----|-------------|
@@ -154,35 +153,31 @@ Script: `scripts/seed.ts` — ejecutar con `npx tsx scripts/seed.ts`
 | lucia@test.com | test123 | donante | le dio mesa a agrim |
 | pedro@test.com | test123 | donante | le dio refrigerador a agrim |
 
-**Items seeded (12 total, Santiago Centro):**
-
-| Barrio | Items | Cluster count en mapa |
-|--------|-------|----------------------|
-| Plaza de Armas | Sofá + Sillón + Bicicleta | 3 |
-| Barrio Lastarria | Libros + Microondas | 2 |
-| Barrio Italia | Sillas jardín (+ Caja ropa picked_up) | 1 |
-| Barrio República | Lavadora (reserved) + Mesa (picked_up) | 0 — no aparece |
-| Barrio Yungay | TV (reserved) + Refrigerador (picked_up) | 0 — no aparece |
-| Concha y Toro | Juguetes (picked_up) | 0 — no aparece |
-
-**Matches seeded (6):**
-- jorge→agrim (Lavadora): confirmed
-- jorge→agrim (Caja ropa): completed
-- agrim→lucia (Mesa comedor): completed
-- agrim→pedro (Refrigerador): completed
-- jorge→maria (TV 32): confirmed
-- jorge→maria (Juguetes): completed
-
-**Reviews seeded (8):** en los 4 matches completed, bidireccionales.
+**Reviews seeded:** en matches completed, bidireccionales.
 
 ---
 
 ## Modelo tokens
 
-- 3 matches gratis/mes (`FREE_MATCHES_PER_MONTH` en `lib/data.ts`)
+- 4 matches gratis/mes (`FREE_MATCHES_PER_MONTH` en `lib/tokens.ts`)
 - Cada match adicional = 1 token
-- Precio token: definido en `TOKEN_PRICE_CLP` en `lib/data.ts`
-- Compra vía MercadoPago (webhook en `/api/tokens/webhook`)
+- Precio token: `TOKEN_PRICE_CLP` en `lib/tokens.ts` (1000 CLP)
+- `lib/data.ts` re-exporta ambas constantes para UI consumers
+- Compra vía MercadoPago (webhook en `/api/tokens/webhook`) — **pendiente credenciales prod**
+
+---
+
+## Arquitectura lib/
+
+| Archivo | Rol |
+|---------|-----|
+| `lib/tokens.ts` | Lógica tokens: FREE_MATCHES_PER_MONTH, TOKEN_PRICE_CLP, spendMatchToken, addTokens, recalculateAverageRating |
+| `lib/data.ts` | Constantes UI: CATEGORIES, CITIES. Re-exporta FREE_MATCHES_PER_MONTH + TOKEN_PRICE_CLP desde tokens.ts |
+| `lib/types.ts` | Tipos DB-aligned: Profile, Item, Match, Review, TokenBalance |
+| `lib/auth.ts` | Better Auth server config + drizzle adapter + databaseHook crea profile en registro |
+| `lib/auth-client.ts` | Better Auth client (signIn, signUp, signOut, useSession) |
+| `lib/db.ts` | Drizzle + Neon HTTP driver |
+| `lib/utils.ts` | cn() helper (clsx + tailwind-merge) |
 
 ---
 
@@ -211,8 +206,7 @@ npx tsx scripts/seed.ts  # seed prod (borra y re-inserta todo)
 
 ## Pendiente
 
-- **R2 integration:** bucket `free-pickup`, presigned URLs, upload en `photo-upload`, storage en `item_photos`
-- **Pagos reales:** MercadoPago access token prod → suscripciones tokens
+- **R2 integration:** bucket `free-pickup`, presigned URLs, upload real en `items/new`, storage en `item_photos`
+- **Pagos reales:** MercadoPago access token prod → activar flujo tokens
 - **Geolocalización avanzada:** filtro por distancia, rutas fleteros
 - **Google OAuth:** configurar redirect URIs en Google Console para prod
-- **Consolidar `lib/db.ts` y `lib/db/index.ts`** — posibles duplicados

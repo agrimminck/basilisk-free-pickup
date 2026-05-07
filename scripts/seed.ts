@@ -31,12 +31,12 @@ const scryptAsync = promisify(scrypt);
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   // maxmem must be > 128 * N * r * p = 33554432; add 1MB buffer for Node.js validator
-  const hash = await scryptAsync(password.normalize("NFKC"), salt, 64, {
+  const hash = (await scryptAsync(password.normalize("NFKC"), salt, 64, {
     N: 16384,
     r: 16,
     p: 1,
     maxmem: 33554432 + 1048576,
-  }) as Buffer;
+  })) as Buffer;
   return `${salt}:${hash.toString("hex")}`;
 }
 
@@ -67,19 +67,19 @@ async function seed() {
 
   // ── 3. Create users — 5 original + 8 new ───────────────────────────────────
   const userData = [
-    { email: "agrim@test.com",      name: "Agrim Mincks" },
-    { email: "maria@test.com",      name: "María González" },
-    { email: "jorge@test.com",      name: "Jorge Ramírez" },
-    { email: "lucia@test.com",      name: "Lucía Herrera" },
-    { email: "pedro@test.com",      name: "Pedro Soto" },
-    { email: "carlos@test.com",     name: "Carlos Muñoz" },
-    { email: "sofia@test.com",      name: "Sofía Vega" },
-    { email: "diego@test.com",      name: "Diego Paredes" },
-    { email: "valentina@test.com",  name: "Valentina Castro" },
-    { email: "rodrigo@test.com",    name: "Rodrigo Fuentes" },
-    { email: "camila@test.com",     name: "Camila Torres" },
-    { email: "andres@test.com",     name: "Andrés Morales" },
-    { email: "javiera@test.com",    name: "Javiera Rojas" },
+    { email: "agrim@test.com", name: "Agrimminck" },
+    { email: "maria@test.com", name: "María González" },
+    { email: "jorge@test.com", name: "Jorge Ramírez" },
+    { email: "lucia@test.com", name: "Lucía Herrera" },
+    { email: "pedro@test.com", name: "Pedro Soto" },
+    { email: "carlos@test.com", name: "Carlos Muñoz" },
+    { email: "sofia@test.com", name: "Sofía Vega" },
+    { email: "diego@test.com", name: "Diego Paredes" },
+    { email: "valentina@test.com", name: "Valentina Castro" },
+    { email: "rodrigo@test.com", name: "Rodrigo Fuentes" },
+    { email: "camila@test.com", name: "Camila Torres" },
+    { email: "andres@test.com", name: "Andrés Morales" },
+    { email: "javiera@test.com", name: "Javiera Rojas" },
   ];
 
   const userIds: Record<string, string> = {};
@@ -107,19 +107,19 @@ async function seed() {
 
   // ── 5. Create profiles ──────────────────────────────────────────────────────
   const profileData = [
-    { email: "agrim@test.com",     role: "donante" as const, tokensBalance: 15 },
-    { email: "maria@test.com",     role: "donante" as const, tokensBalance: 5 },
-    { email: "jorge@test.com",     role: "fletero" as const, tokensBalance: 20 },
-    { email: "lucia@test.com",     role: "donante" as const, tokensBalance: 3 },
-    { email: "pedro@test.com",     role: "donante" as const, tokensBalance: 8 },
-    { email: "carlos@test.com",    role: "donante" as const, tokensBalance: 6 },
-    { email: "sofia@test.com",     role: "donante" as const, tokensBalance: 4 },
-    { email: "diego@test.com",     role: "donante" as const, tokensBalance: 7 },
+    { email: "agrim@test.com", role: "donante" as const, tokensBalance: 15 },
+    { email: "maria@test.com", role: "donante" as const, tokensBalance: 5 },
+    { email: "jorge@test.com", role: "fletero" as const, tokensBalance: 20 },
+    { email: "lucia@test.com", role: "donante" as const, tokensBalance: 3 },
+    { email: "pedro@test.com", role: "donante" as const, tokensBalance: 8 },
+    { email: "carlos@test.com", role: "donante" as const, tokensBalance: 6 },
+    { email: "sofia@test.com", role: "donante" as const, tokensBalance: 4 },
+    { email: "diego@test.com", role: "donante" as const, tokensBalance: 7 },
     { email: "valentina@test.com", role: "donante" as const, tokensBalance: 2 },
-    { email: "rodrigo@test.com",   role: "donante" as const, tokensBalance: 9 },
-    { email: "camila@test.com",    role: "donante" as const, tokensBalance: 3 },
-    { email: "andres@test.com",    role: "donante" as const, tokensBalance: 5 },
-    { email: "javiera@test.com",   role: "donante" as const, tokensBalance: 1 },
+    { email: "rodrigo@test.com", role: "donante" as const, tokensBalance: 9 },
+    { email: "camila@test.com", role: "donante" as const, tokensBalance: 3 },
+    { email: "andres@test.com", role: "donante" as const, tokensBalance: 5 },
+    { email: "javiera@test.com", role: "donante" as const, tokensBalance: 1 },
   ];
 
   const profileIds: Record<string, string> = {};
@@ -136,26 +136,33 @@ async function seed() {
     });
   }
 
-  const agrimPid     = profileIds["agrim@test.com"];
-  const mariaPid     = profileIds["maria@test.com"];
-  const jorgePid     = profileIds["jorge@test.com"];
-  const luciaPid     = profileIds["lucia@test.com"];
-  const pedroPid     = profileIds["pedro@test.com"];
-  const carlosPid    = profileIds["carlos@test.com"];
-  const sofiaPid     = profileIds["sofia@test.com"];
-  const diegoPid     = profileIds["diego@test.com"];
+  const agrimPid = profileIds["agrim@test.com"];
+  const mariaPid = profileIds["maria@test.com"];
+  const jorgePid = profileIds["jorge@test.com"];
+  const luciaPid = profileIds["lucia@test.com"];
+  const pedroPid = profileIds["pedro@test.com"];
+  const carlosPid = profileIds["carlos@test.com"];
+  const sofiaPid = profileIds["sofia@test.com"];
+  const diegoPid = profileIds["diego@test.com"];
   const valentinaPid = profileIds["valentina@test.com"];
-  const rodrigoPid   = profileIds["rodrigo@test.com"];
-  const camilaPid    = profileIds["camila@test.com"];
-  const andresPid    = profileIds["andres@test.com"];
-  const javieraPid   = profileIds["javiera@test.com"];
+  const rodrigoPid = profileIds["rodrigo@test.com"];
+  const camilaPid = profileIds["camila@test.com"];
+  const andresPid = profileIds["andres@test.com"];
+  const javieraPid = profileIds["javiera@test.com"];
 
   // ── 6. Create items ─────────────────────────────────────────────────────────
   type ItemDef = {
     donanteId: string;
     title: string;
     description: string;
-    category: "muebles" | "electrodomesticos" | "ropa" | "electronica" | "juguetes" | "libros" | "otros";
+    category:
+      | "muebles"
+      | "electrodomesticos"
+      | "ropa"
+      | "electronica"
+      | "juguetes"
+      | "libros"
+      | "otros";
     neighborhood: string;
     status: "available" | "reserved" | "picked_up";
     itemType: "donation" | "sale";
@@ -168,36 +175,36 @@ async function seed() {
 
   // 30 Santiago Centro coordinate groups
   const coords: Record<string, { lat: string; lng: string }> = {
-    "Plaza de Armas":            { lat: "-33.438", lng: "-70.650" },
-    "Barrio Lastarria":          { lat: "-33.438", lng: "-70.640" },
-    "Barrio Italia":             { lat: "-33.453", lng: "-70.630" },
-    "Barrio República":          { lat: "-33.458", lng: "-70.657" },
-    "Barrio Yungay":             { lat: "-33.448", lng: "-70.662" },
-    "Concha y Toro":             { lat: "-33.454", lng: "-70.656" },
-    "Barrio Brasil":             { lat: "-33.445", lng: "-70.668" },
-    "Barrio Dieciocho":          { lat: "-33.460", lng: "-70.652" },
-    "Barrio Matta Norte":        { lat: "-33.456", lng: "-70.642" },
-    "Av. Matta":                 { lat: "-33.462", lng: "-70.638" },
-    "Barrio Balmaceda":          { lat: "-33.440", lng: "-70.658" },
-    "Barrio Santa Isabel":       { lat: "-33.456", lng: "-70.630" },
-    "Barrio Lira":               { lat: "-33.453", lng: "-70.645" },
-    "Av. España":                { lat: "-33.443", lng: "-70.663" },
-    "Barrio Paris-Londres":      { lat: "-33.451", lng: "-70.649" },
-    "Barrio Almagro":            { lat: "-33.462", lng: "-70.652" },
-    "Barrio Vivaceta":           { lat: "-33.442", lng: "-70.673" },
-    "Barrio Recoleta":           { lat: "-33.432", lng: "-70.645" },
-    "Barrio Patronato":          { lat: "-33.430", lng: "-70.645" },
-    "Barrio Bellas Artes":       { lat: "-33.436", lng: "-70.644" },
-    "Plaza Baquedano":           { lat: "-33.438", lng: "-70.633" },
-    "Barrio Pio Nono":           { lat: "-33.430", lng: "-70.636" },
-    "Barrio Loreto":             { lat: "-33.448", lng: "-70.635" },
-    "Av. Vicuña Mackenna":       { lat: "-33.462", lng: "-70.626" },
-    "Barrio San Eugenio":        { lat: "-33.466", lng: "-70.635" },
-    "Barrio Club Hípico":        { lat: "-33.462", lng: "-70.644" },
-    "Barrio Chuchunco":          { lat: "-33.462", lng: "-70.677" },
-    "Barrio Manuel Rodríguez":   { lat: "-33.443", lng: "-70.672" },
-    "Av. General Velásquez":     { lat: "-33.450", lng: "-70.678" },
-    "Barrio Quinta Normal":      { lat: "-33.445", lng: "-70.677" },
+    "Plaza de Armas": { lat: "-33.438", lng: "-70.650" },
+    "Barrio Lastarria": { lat: "-33.438", lng: "-70.640" },
+    "Barrio Italia": { lat: "-33.453", lng: "-70.630" },
+    "Barrio República": { lat: "-33.458", lng: "-70.657" },
+    "Barrio Yungay": { lat: "-33.448", lng: "-70.662" },
+    "Concha y Toro": { lat: "-33.454", lng: "-70.656" },
+    "Barrio Brasil": { lat: "-33.445", lng: "-70.668" },
+    "Barrio Dieciocho": { lat: "-33.460", lng: "-70.652" },
+    "Barrio Matta Norte": { lat: "-33.456", lng: "-70.642" },
+    "Av. Matta": { lat: "-33.462", lng: "-70.638" },
+    "Barrio Balmaceda": { lat: "-33.440", lng: "-70.658" },
+    "Barrio Santa Isabel": { lat: "-33.456", lng: "-70.630" },
+    "Barrio Lira": { lat: "-33.453", lng: "-70.645" },
+    "Av. España": { lat: "-33.443", lng: "-70.663" },
+    "Barrio Paris-Londres": { lat: "-33.451", lng: "-70.649" },
+    "Barrio Almagro": { lat: "-33.462", lng: "-70.652" },
+    "Barrio Vivaceta": { lat: "-33.442", lng: "-70.673" },
+    "Barrio Recoleta": { lat: "-33.432", lng: "-70.645" },
+    "Barrio Patronato": { lat: "-33.430", lng: "-70.645" },
+    "Barrio Bellas Artes": { lat: "-33.436", lng: "-70.644" },
+    "Plaza Baquedano": { lat: "-33.438", lng: "-70.633" },
+    "Barrio Pio Nono": { lat: "-33.430", lng: "-70.636" },
+    "Barrio Loreto": { lat: "-33.448", lng: "-70.635" },
+    "Av. Vicuña Mackenna": { lat: "-33.462", lng: "-70.626" },
+    "Barrio San Eugenio": { lat: "-33.466", lng: "-70.635" },
+    "Barrio Club Hípico": { lat: "-33.462", lng: "-70.644" },
+    "Barrio Chuchunco": { lat: "-33.462", lng: "-70.677" },
+    "Barrio Manuel Rodríguez": { lat: "-33.443", lng: "-70.672" },
+    "Av. General Velásquez": { lat: "-33.450", lng: "-70.678" },
+    "Barrio Quinta Normal": { lat: "-33.445", lng: "-70.677" },
   };
 
   // 65 items total. Items needed for matches use non-available statuses (6 items).
@@ -207,7 +214,8 @@ async function seed() {
     {
       donanteId: agrimPid,
       title: "Sofá 3 cuerpos beige",
-      description: "Sofá de 3 cuerpos en excelente estado, color beige, pocos años de uso.",
+      description:
+        "Sofá de 3 cuerpos en excelente estado, color beige, pocos años de uso.",
       category: "muebles",
       neighborhood: "Plaza de Armas",
       status: "available",
@@ -231,7 +239,8 @@ async function seed() {
     {
       donanteId: pedroPid,
       title: "Bicicleta de montaña rodado 26",
-      description: "Bicicleta de montaña rodado 26, en buen estado, con cambios Shimano.",
+      description:
+        "Bicicleta de montaña rodado 26, en buen estado, con cambios Shimano.",
       category: "otros",
       neighborhood: "Plaza de Armas",
       status: "available",
@@ -243,7 +252,8 @@ async function seed() {
     {
       donanteId: carlosPid,
       title: "Escritorio madera con cajones",
-      description: "Escritorio de madera sólida con 3 cajones, ideal para estudio u oficina.",
+      description:
+        "Escritorio de madera sólida con 3 cajones, ideal para estudio u oficina.",
       category: "muebles",
       neighborhood: "Plaza de Armas",
       status: "available",
@@ -257,7 +267,8 @@ async function seed() {
     {
       donanteId: mariaPid,
       title: "Libros universitarios medicina",
-      description: "Colección de libros de medicina universitaria, ediciones actualizadas.",
+      description:
+        "Colección de libros de medicina universitaria, ediciones actualizadas.",
       category: "libros",
       neighborhood: "Barrio Lastarria",
       status: "available",
@@ -281,7 +292,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Monitor 22 pulgadas Full HD",
-      description: "Monitor 22 pulgadas Full HD, sin píxeles muertos, con cable HDMI.",
+      description:
+        "Monitor 22 pulgadas Full HD, sin píxeles muertos, con cable HDMI.",
       category: "electronica",
       neighborhood: "Barrio Lastarria",
       status: "available",
@@ -295,10 +307,11 @@ async function seed() {
     {
       donanteId: agrimPid,
       title: "Caja ropa de invierno",
-      description: "Caja grande con ropa de invierno en buen estado, tallas variadas.",
+      description:
+        "Caja grande con ropa de invierno en buen estado, tallas variadas.",
       category: "ropa",
       neighborhood: "Barrio Italia",
-      status: "picked_up",   // used in match idx=1
+      status: "picked_up", // used in match idx=1
       itemType: "donation",
       address: "Av. Italia 1200, Barrio Italia",
       city: "Santiago",
@@ -319,7 +332,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Cafetera italiana moka 6 tazas",
-      description: "Cafetera moka italiana de aluminio para 6 tazas, en perfecto estado.",
+      description:
+        "Cafetera moka italiana de aluminio para 6 tazas, en perfecto estado.",
       category: "electrodomesticos",
       neighborhood: "Barrio Italia",
       status: "available",
@@ -336,7 +350,7 @@ async function seed() {
       description: "Lavadora LG carga frontal 10kg, funciona perfectamente.",
       category: "electrodomesticos",
       neighborhood: "Barrio República",
-      status: "reserved",   // used in match idx=0
+      status: "reserved", // used in match idx=0
       itemType: "donation",
       address: "Av. República 450, Barrio República",
       city: "Santiago",
@@ -349,7 +363,7 @@ async function seed() {
       description: "Mesa de madera para 6 personas, incluye 6 sillas a juego.",
       category: "muebles",
       neighborhood: "Barrio República",
-      status: "picked_up",  // used in match idx=2
+      status: "picked_up", // used in match idx=2
       itemType: "donation",
       address: "Calle Serrano 150, Barrio República",
       city: "Santiago",
@@ -363,7 +377,7 @@ async function seed() {
       description: "Smart TV LG 32 pulgadas, con control remoto y cables.",
       category: "electronica",
       neighborhood: "Barrio Yungay",
-      status: "reserved",   // used in match idx=4
+      status: "reserved", // used in match idx=4
       itemType: "donation",
       address: "Av. Cumming 100, Barrio Yungay",
       city: "Santiago",
@@ -373,10 +387,11 @@ async function seed() {
     {
       donanteId: pedroPid,
       title: "Refrigerador Mabe 350L doble puerta",
-      description: "Refrigerador Mabe 350L doble puerta, funcionando perfectamente.",
+      description:
+        "Refrigerador Mabe 350L doble puerta, funcionando perfectamente.",
       category: "electrodomesticos",
       neighborhood: "Barrio Yungay",
-      status: "picked_up",  // used in match idx=3
+      status: "picked_up", // used in match idx=3
       itemType: "donation",
       address: "Calle Libertad 250, Barrio Yungay",
       city: "Santiago",
@@ -385,7 +400,8 @@ async function seed() {
     {
       donanteId: valentinaPid,
       title: "Ropa de bebé talla 0-12 meses",
-      description: "Bolsa con ropa de bebé talla 0 a 12 meses, en buen estado, sin manchas.",
+      description:
+        "Bolsa con ropa de bebé talla 0 a 12 meses, en buen estado, sin manchas.",
       category: "ropa",
       neighborhood: "Barrio Yungay",
       status: "available",
@@ -399,10 +415,11 @@ async function seed() {
     {
       donanteId: mariaPid,
       title: "Juguetes varios (bolsa grande)",
-      description: "Bolsa grande con juguetes variados en buen estado, para niños 3-10 años.",
+      description:
+        "Bolsa grande con juguetes variados en buen estado, para niños 3-10 años.",
       category: "juguetes",
       neighborhood: "Concha y Toro",
-      status: "picked_up",  // used in match idx=5
+      status: "picked_up", // used in match idx=5
       itemType: "donation",
       address: "Calle Dieciocho 120, Concha y Toro",
       city: "Santiago",
@@ -413,7 +430,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Librero de madera 5 repisas",
-      description: "Librero de madera pino, 5 repisas, fácil de desarmar y transportar.",
+      description:
+        "Librero de madera pino, 5 repisas, fácil de desarmar y transportar.",
       category: "muebles",
       neighborhood: "Barrio Brasil",
       status: "available",
@@ -425,7 +443,8 @@ async function seed() {
     {
       donanteId: camilaPid,
       title: "Aspiradora Electrolux sin bolsa",
-      description: "Aspiradora Electrolux sin bolsa, con todos los accesorios, funciona bien.",
+      description:
+        "Aspiradora Electrolux sin bolsa, con todos los accesorios, funciona bien.",
       category: "electrodomesticos",
       neighborhood: "Barrio Brasil",
       status: "available",
@@ -451,7 +470,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Plancha a vapor Oster",
-      description: "Plancha a vapor Oster en buen estado, con cable en perfecto estado.",
+      description:
+        "Plancha a vapor Oster en buen estado, con cable en perfecto estado.",
       category: "electrodomesticos",
       neighborhood: "Barrio Dieciocho",
       status: "available",
@@ -477,7 +497,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Teclado USB y mouse inalámbrico",
-      description: "Set teclado USB y mouse inalámbrico, ambos funcionando correctamente.",
+      description:
+        "Set teclado USB y mouse inalámbrico, ambos funcionando correctamente.",
       category: "electronica",
       neighborhood: "Barrio Matta Norte",
       status: "available",
@@ -489,7 +510,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Novelas policiales (lote 10)",
-      description: "Lote de 10 novelas policiales en buen estado, autores varios.",
+      description:
+        "Lote de 10 novelas policiales en buen estado, autores varios.",
       category: "libros",
       neighborhood: "Barrio Matta Norte",
       status: "available",
@@ -515,7 +537,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Silla de escritorio con ruedas",
-      description: "Silla de escritorio ergonómica con ruedas, regulable en altura.",
+      description:
+        "Silla de escritorio ergonómica con ruedas, regulable en altura.",
       category: "muebles",
       neighborhood: "Av. Matta",
       status: "available",
@@ -529,7 +552,8 @@ async function seed() {
     {
       donanteId: camilaPid,
       title: "Herramientas de jardín (set)",
-      description: "Set de herramientas de jardín: pala, rastrillo, azada y tijeras.",
+      description:
+        "Set de herramientas de jardín: pala, rastrillo, azada y tijeras.",
       category: "otros",
       neighborhood: "Barrio Balmaceda",
       status: "available",
@@ -541,7 +565,8 @@ async function seed() {
     {
       donanteId: andresPid,
       title: "Velador con lámpara",
-      description: "Velador de madera con lámpara de escritorio incluida, buen estado.",
+      description:
+        "Velador de madera con lámpara de escritorio incluida, buen estado.",
       category: "muebles",
       neighborhood: "Barrio Balmaceda",
       status: "available",
@@ -555,7 +580,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Hervidor eléctrico Oster 1.7L",
-      description: "Hervidor eléctrico Oster de 1.7 litros, sin calcificación, funciona bien.",
+      description:
+        "Hervidor eléctrico Oster de 1.7 litros, sin calcificación, funciona bien.",
       category: "electrodomesticos",
       neighborhood: "Barrio Santa Isabel",
       status: "available",
@@ -607,7 +633,8 @@ async function seed() {
     {
       donanteId: valentinaPid,
       title: "Macetas de cerámica x3",
-      description: "Tres macetas de cerámica de distintos tamaños, sin plantas.",
+      description:
+        "Tres macetas de cerámica de distintos tamaños, sin plantas.",
       category: "otros",
       neighborhood: "Av. España",
       status: "available",
@@ -619,7 +646,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Triciclo infantil rojo",
-      description: "Triciclo infantil color rojo para niños 2-4 años, en buen estado.",
+      description:
+        "Triciclo infantil color rojo para niños 2-4 años, en buen estado.",
       category: "juguetes",
       neighborhood: "Av. España",
       status: "available",
@@ -645,7 +673,8 @@ async function seed() {
     {
       donanteId: andresPid,
       title: "Router WiFi Tp-Link",
-      description: "Router TP-Link doble banda, funciona bien, con cable de red y alimentador.",
+      description:
+        "Router TP-Link doble banda, funciona bien, con cable de red y alimentador.",
       category: "electronica",
       neighborhood: "Barrio Paris-Londres",
       status: "available",
@@ -659,7 +688,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Ropa escolar uniforme talla 8-10",
-      description: "Uniformes escolares talla 8-10 años, lavados y en buen estado.",
+      description:
+        "Uniformes escolares talla 8-10 años, lavados y en buen estado.",
       category: "ropa",
       neighborhood: "Barrio Almagro",
       status: "available",
@@ -671,7 +701,8 @@ async function seed() {
     {
       donanteId: carlosPid,
       title: "Tostadora 2 ranuras Imaco",
-      description: "Tostadora 2 ranuras marca Imaco, con selector de intensidad, funciona bien.",
+      description:
+        "Tostadora 2 ranuras marca Imaco, con selector de intensidad, funciona bien.",
       category: "electrodomesticos",
       neighborhood: "Barrio Almagro",
       status: "available",
@@ -685,7 +716,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Maleta de viaje mediana",
-      description: "Maleta de viaje mediana con ruedas, negra, sin daños en el cierre.",
+      description:
+        "Maleta de viaje mediana con ruedas, negra, sin daños en el cierre.",
       category: "otros",
       neighborhood: "Barrio Vivaceta",
       status: "available",
@@ -697,7 +729,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Espejo de pie rectangular",
-      description: "Espejo de pie rectangular con marco de madera oscura, 170x50 cm.",
+      description:
+        "Espejo de pie rectangular con marco de madera oscura, 170x50 cm.",
       category: "otros",
       neighborhood: "Barrio Vivaceta",
       status: "available",
@@ -723,7 +756,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Parlantes Bluetooth pequeños",
-      description: "Par de parlantes Bluetooth compactos, carga USB, sonido claro.",
+      description:
+        "Par de parlantes Bluetooth compactos, carga USB, sonido claro.",
       category: "electronica",
       neighborhood: "Barrio Recoleta",
       status: "available",
@@ -737,7 +771,8 @@ async function seed() {
     {
       donanteId: camilaPid,
       title: "Ropero 3 cuerpos melamina",
-      description: "Ropero de melamina color wengué, 3 cuerpos con espejo central.",
+      description:
+        "Ropero de melamina color wengué, 3 cuerpos con espejo central.",
       category: "muebles",
       neighborhood: "Barrio Patronato",
       status: "available",
@@ -749,7 +784,8 @@ async function seed() {
     {
       donanteId: andresPid,
       title: "Bicicleta infantil rodado 20",
-      description: "Bicicleta infantil rodado 20, color azul, con rueditas de apoyo.",
+      description:
+        "Bicicleta infantil rodado 20, color azul, con rueditas de apoyo.",
       category: "juguetes",
       neighborhood: "Barrio Patronato",
       status: "available",
@@ -761,7 +797,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Artículos de cocina varios",
-      description: "Lote de utensilios de cocina: ollas, sartenes y cubiertos en buen estado.",
+      description:
+        "Lote de utensilios de cocina: ollas, sartenes y cubiertos en buen estado.",
       category: "otros",
       neighborhood: "Barrio Patronato",
       status: "available",
@@ -775,7 +812,8 @@ async function seed() {
     {
       donanteId: carlosPid,
       title: "Tablet Samsung A7 lite",
-      description: "Tablet Samsung Galaxy A7 Lite, pantalla sin grietas, funciona bien.",
+      description:
+        "Tablet Samsung Galaxy A7 Lite, pantalla sin grietas, funciona bien.",
       category: "electronica",
       neighborhood: "Barrio Bellas Artes",
       status: "available",
@@ -787,7 +825,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Libros de texto escolar (básica)",
-      description: "Libros de texto educación básica, varios grados, en buen estado.",
+      description:
+        "Libros de texto educación básica, varios grados, en buen estado.",
       category: "libros",
       neighborhood: "Barrio Bellas Artes",
       status: "available",
@@ -799,7 +838,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Estante metálico 5 niveles",
-      description: "Estante metálico de 5 niveles, desmontable, muy resistente.",
+      description:
+        "Estante metálico de 5 niveles, desmontable, muy resistente.",
       category: "muebles",
       neighborhood: "Barrio Bellas Artes",
       status: "available",
@@ -813,7 +853,8 @@ async function seed() {
     {
       donanteId: valentinaPid,
       title: "Ropa de verano mujer talla S",
-      description: "Bolsa con ropa de verano para mujer talla S, en buen estado.",
+      description:
+        "Bolsa con ropa de verano para mujer talla S, en buen estado.",
       category: "ropa",
       neighborhood: "Plaza Baquedano",
       status: "available",
@@ -825,7 +866,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Licuadora Oster 3 velocidades",
-      description: "Licuadora Oster de 3 velocidades con jarra de vidrio, funciona bien.",
+      description:
+        "Licuadora Oster de 3 velocidades con jarra de vidrio, funciona bien.",
       category: "electrodomesticos",
       neighborhood: "Plaza Baquedano",
       status: "available",
@@ -839,7 +881,8 @@ async function seed() {
     {
       donanteId: camilaPid,
       title: "Cables HDMI y USB varios",
-      description: "Lote de cables HDMI y USB de distintas medidas, todos funcionando.",
+      description:
+        "Lote de cables HDMI y USB de distintas medidas, todos funcionando.",
       category: "electronica",
       neighborhood: "Barrio Pio Nono",
       status: "available",
@@ -863,7 +906,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Secadora de pelo Remington",
-      description: "Secadora de pelo Remington 2200W, con difusor, en buen estado.",
+      description:
+        "Secadora de pelo Remington 2200W, con difusor, en buen estado.",
       category: "electrodomesticos",
       neighborhood: "Barrio Pio Nono",
       status: "available",
@@ -877,7 +921,8 @@ async function seed() {
     {
       donanteId: carlosPid,
       title: "Revistas National Geographic (20 ed)",
-      description: "20 ediciones de National Geographic en buen estado, varios años.",
+      description:
+        "20 ediciones de National Geographic en buen estado, varios años.",
       category: "libros",
       neighborhood: "Barrio Loreto",
       status: "available",
@@ -889,7 +934,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Mesa ratona de vidrio",
-      description: "Mesa ratona con tapa de vidrio y estructura de metal, en buen estado.",
+      description:
+        "Mesa ratona con tapa de vidrio y estructura de metal, en buen estado.",
       category: "muebles",
       neighborhood: "Barrio Loreto",
       status: "available",
@@ -903,7 +949,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Herramientas básicas (martillo, llaves)",
-      description: "Set de herramientas básicas: martillo, set de llaves y destornilladores.",
+      description:
+        "Set de herramientas básicas: martillo, set de llaves y destornilladores.",
       category: "otros",
       neighborhood: "Av. Vicuña Mackenna",
       status: "available",
@@ -915,7 +962,8 @@ async function seed() {
     {
       donanteId: andresPid,
       title: "Sartén antiadherente 28cm",
-      description: "Sartén antiadherente de 28cm marca Tramontina, en buen estado.",
+      description:
+        "Sartén antiadherente de 28cm marca Tramontina, en buen estado.",
       category: "otros",
       neighborhood: "Av. Vicuña Mackenna",
       status: "available",
@@ -929,7 +977,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Silla plegable de playa",
-      description: "Silla plegable de tela para playa o camping, en buen estado.",
+      description:
+        "Silla plegable de tela para playa o camping, en buen estado.",
       category: "otros",
       neighborhood: "Barrio San Eugenio",
       status: "available",
@@ -955,7 +1004,8 @@ async function seed() {
     {
       donanteId: rodrigoPid,
       title: "Lego Duplo (caja grande)",
-      description: "Caja grande con bloques Lego Duplo, piezas completas, bien lavados.",
+      description:
+        "Caja grande con bloques Lego Duplo, piezas completas, bien lavados.",
       category: "juguetes",
       neighborhood: "Barrio Club Hípico",
       status: "available",
@@ -969,7 +1019,8 @@ async function seed() {
     {
       donanteId: camilaPid,
       title: "Sofá cama 2 cuerpos",
-      description: "Sofá cama de 2 cuerpos, tela café, desplegable en buen estado.",
+      description:
+        "Sofá cama de 2 cuerpos, tela café, desplegable en buen estado.",
       category: "muebles",
       neighborhood: "Barrio Chuchunco",
       status: "available",
@@ -983,7 +1034,8 @@ async function seed() {
     {
       donanteId: andresPid,
       title: "Parlante JBL portátil",
-      description: "Parlante JBL Clip 3 portátil, batería dura 10 horas, con mosquetón.",
+      description:
+        "Parlante JBL Clip 3 portátil, batería dura 10 horas, con mosquetón.",
       category: "electronica",
       neighborhood: "Barrio Manuel Rodríguez",
       status: "available",
@@ -995,7 +1047,8 @@ async function seed() {
     {
       donanteId: javieraPid,
       title: "Ropa de invierno niño 6-8 años",
-      description: "Ropa de invierno para niño talla 6-8 años: abrigos, poleras y pantalones.",
+      description:
+        "Ropa de invierno para niño talla 6-8 años: abrigos, poleras y pantalones.",
       category: "ropa",
       neighborhood: "Barrio Manuel Rodríguez",
       status: "available",
@@ -1009,7 +1062,8 @@ async function seed() {
     {
       donanteId: carlosPid,
       title: "Estante de baño con espejo",
-      description: "Mueble de baño con espejo y 2 repisas, color blanco, sin daños.",
+      description:
+        "Mueble de baño con espejo y 2 repisas, color blanco, sin daños.",
       category: "muebles",
       neighborhood: "Av. General Velásquez",
       status: "available",
@@ -1023,7 +1077,8 @@ async function seed() {
     {
       donanteId: sofiaPid,
       title: "Cajas de herramientas plástica",
-      description: "Caja de herramientas plástica con bandeja, sin herramientas incluidas.",
+      description:
+        "Caja de herramientas plástica con bandeja, sin herramientas incluidas.",
       category: "otros",
       neighborhood: "Barrio Quinta Normal",
       status: "available",
@@ -1035,7 +1090,8 @@ async function seed() {
     {
       donanteId: diegoPid,
       title: "Olla arrocera eléctrica 1.8L",
-      description: "Olla arrocera eléctrica 1.8 litros, con cuchara y vaso medidor.",
+      description:
+        "Olla arrocera eléctrica 1.8 litros, con cuchara y vaso medidor.",
       category: "electrodomesticos",
       neighborhood: "Barrio Quinta Normal",
       status: "available",
@@ -1073,13 +1129,13 @@ async function seed() {
 
   // ── 7. Create item_photos (1 photo per item) ────────────────────────────────
   const categoryPhotoSeed: Record<string, string> = {
-    muebles:          "muebles",
+    muebles: "muebles",
     electrodomesticos: "electro",
-    ropa:             "ropa",
-    electronica:      "electro",
-    libros:           "libros",
-    juguetes:         "juguetes",
-    otros:            "otros",
+    ropa: "ropa",
+    electronica: "electro",
+    libros: "libros",
+    juguetes: "juguetes",
+    otros: "otros",
   };
 
   let photoCount = 0;
@@ -1298,10 +1354,14 @@ async function seed() {
   console.log("Updated averageRating for all profiles.");
 
   // ── Summary ─────────────────────────────────────────────────────────────────
-  const availableCount = itemDefs.filter((i) => i.status === "available").length;
+  const availableCount = itemDefs.filter(
+    (i) => i.status === "available",
+  ).length;
   console.log("\n=== SEED COMPLETE ===");
   console.log(`Users: ${userData.length}`);
-  console.log(`Items: ${itemDefs.length} total, ${availableCount} available (map markers)`);
+  console.log(
+    `Items: ${itemDefs.length} total, ${availableCount} available (map markers)`,
+  );
   console.log(`Item photos: ${photoCount}`);
   console.log(`Matches: ${matchDefs.length}`);
   console.log(`Reviews: ${reviewDefs.length}`);

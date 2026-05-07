@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { auth } from "../../../lib/auth";
-import { db } from "../../../lib/db";
-import { items, itemPhotos, profiles } from "../../../db/schema";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { items, itemPhotos, profiles } from "@/db/schema";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);

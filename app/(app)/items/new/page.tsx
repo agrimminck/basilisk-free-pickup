@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, X, MapPin, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "../../../../components/ui/button";
-import { Input } from "../../../../components/ui/input";
-import { Textarea } from "../../../../components/ui/textarea";
-import { Select } from "../../../../components/ui/select";
-import { CATEGORIES, CITIES } from "../../../../lib/data";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { CATEGORIES, CITIES } from "@/lib/data";
 
 const MAX_PHOTOS = 5;
+// Storage tracking pending R2 integration — hardcoded placeholder
 const STORAGE_USED = 3;
 const STORAGE_LIMIT = 10;
 

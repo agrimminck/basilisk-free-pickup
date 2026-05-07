@@ -41,7 +41,7 @@ function TokensPageInner() {
       try {
         const [balanceRes, profileRes] = await Promise.all([
           fetch("/api/tokens/balance"),
-          fetch("/api/profile"),
+          fetch("/api/user/me"),
         ]);
         if (balanceRes.ok) {
           const b = (await balanceRes.json()) as TokenBalance;
