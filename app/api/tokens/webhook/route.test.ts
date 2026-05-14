@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
+import crypto from "node:crypto";
 
 const state: {
   purchasesById: Record<number, { id: number; profileId: string; tokensPurchased: number; status: string }>;
@@ -172,5 +173,117 @@ describe("POST /api/tokens/webhook (MP IPN)", () => {
     await POST(ipn({ type: "payment", data: { id: "MP-DUP" } }));
     await POST(ipn({ type: "payment", data: { id: "MP-DUP" } }));
     expect(state.tokensAdded).toEqual([{ profileId: "p1", amount: 10 }]);
+  });
+});
+
+describe("POST /api/tokens/webhook — MP signature validation", () => {
+  const SECRET = "test-webhook-secret";
+
+  function signedIpn(opts: {
+    body: unknown;
+    dataId: string;
+    requestId?: string | null;
+    ts?: string;
+    v1?: string;
+    omitSignature?: boolean;
+  }): NextRequest {
+    const ts = opts.ts ?? String(Math.floor(Date.now() / 1000));
+    const manifest = `id:${opts.dataId};request-id:${opts.requestId ?? "req-1"};ts:${ts};`;
+    const v1 =
+      opts.v1 ??
+      crypto.createHmac("sha256", SECRET).update(manifest).digest("hex");
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    if (!opts.omitSignature) headers["x-signature"] = `ts=${ts},v1=${v1}`;
+    if (opts.requestId !== null) headers["x-request-id"] = opts.requestId ?? "req-1";
+    return new NextRequest("http://localhost/api/tokens/webhook", {
+      method: "POST",
+      body: JSON.stringify(opts.body),
+      headers,
+    });
+  }
+
+  it("valid signature passes through to processing (approved credits tokens)", async () => {
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = SECRET;
+    state.purchasesById[100] = { id: 100, profileId: "p1", tokensPurchased: 5, status: "pending" };
+    state.fetchImpl = async () =>
+      new Response(JSON.stringify({ status: "approved", external_reference: "100" }), { status: 200 });
+    const { POST } = await loadRoute();
+    const res = await POST(
+      signedIpn({
+        body: { type: "payment", data: { id: "MP-SIG-OK" } },
+        dataId: "MP-SIG-OK",
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(state.tokensAdded).toEqual([{ profileId: "p1", amount: 5 }]);
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  });
+
+  it("invalid signature returns 401 and does not credit", async () => {
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = SECRET;
+    state.purchasesById[100] = { id: 100, profileId: "p1", tokensPurchased: 5, status: "pending" };
+    const { POST } = await loadRoute();
+    const res = await POST(
+      signedIpn({
+        body: { type: "payment", data: { id: "MP-SIG-BAD" } },
+        dataId: "MP-SIG-BAD",
+        v1: "deadbeef".repeat(8),
+      })
+    );
+    expect(res.status).toBe(401);
+    expect(state.tokensAdded).toEqual([]);
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  });
+
+  it("missing x-signature header returns 401", async () => {
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = SECRET;
+    const { POST } = await loadRoute();
+    const res = await POST(
+      signedIpn({
+        body: { type: "payment", data: { id: "MP-NOSIG" } },
+        dataId: "MP-NOSIG",
+        omitSignature: true,
+      })
+    );
+    expect(res.status).toBe(401);
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  });
+
+  it("missing x-request-id header returns 401", async () => {
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = SECRET;
+    const { POST } = await loadRoute();
+    const res = await POST(
+      signedIpn({
+        body: { type: "payment", data: { id: "MP-NORID" } },
+        dataId: "MP-NORID",
+        requestId: null,
+      })
+    );
+    expect(res.status).toBe(401);
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  });
+
+  it("no secret in dev mode passes with warning (back-compat)", async () => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    state.purchasesById[100] = { id: 100, profileId: "p1", tokensPurchased: 5, status: "pending" };
+    state.fetchImpl = async () =>
+      new Response(JSON.stringify({ status: "approved", external_reference: "100" }), { status: 200 });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { POST } = await loadRoute();
+    const res = await POST(ipn({ type: "payment", data: { id: "MP-DEV" } }));
+    expect(res.status).toBe(200);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("no secret in production returns 503", async () => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    vi.stubEnv("NODE_ENV", "production");
+    const { POST } = await loadRoute();
+    const res = await POST(ipn({ type: "payment", data: { id: "MP-PROD" } }));
+    expect(res.status).toBe(503);
+    vi.unstubAllEnvs();
   });
 });

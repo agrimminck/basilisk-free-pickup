@@ -217,13 +217,16 @@ Stack: **Vitest 4 + RTL + jsdom**. Config: `vitest.config.ts`. Setup: `tests/set
 | `lib/tokens.test.ts` | spendMatchToken: free→token→reject, reset boundary UTC mes/año, canSpendMatchToken |
 | `app/api/matches/route.test.ts` | POST match: 401/400/402, self-match, token debit AFTER insert (flag) |
 | `app/api/reviews/route.test.ts` | POST review: 401/400/403/409, bounds rating 1-5, recalc avg, self-review, match completed gate |
-| `app/api/tokens/webhook/route.test.ts` | MP IPN: idempotency completed, approved→credit, rejected→failed, MP API fail silent, race flag |
+| `app/api/tokens/webhook/route.test.ts` | MP IPN: idempotency completed, approved→credit, rejected→failed, MP API fail silent, race flag, **HMAC signature: valid/invalid/missing headers/dev warn/prod 503** |
 
 DB: mocks in-memory (Drizzle + auth). Real Neon test schema pendiente fase 2.
 
 **Bugs flagged en tests** (documentados, no fixed):
 - `matches/route.ts`: match insert + spendMatchToken NO atómicos. Si spend lanza tras insert → match huérfano. Refactor: envolver en `db.transaction`.
 - `tokens/webhook`: check-then-act sin row lock. Dos IPN approved concurrentes podrían pasar el guard `status !== 'completed'` y doble-creditar. Mitigación: `SELECT ... FOR UPDATE` o constraint único en `mp_payment_id`.
+
+**Bugs FIXED:**
+- `tokens/webhook` MP signature validation: **FIXED** (HMAC SHA256 via `lib/mp-signature.ts`). Valida `x-signature` + `x-request-id` contra `MERCADOPAGO_WEBHOOK_SECRET`. Manifest: `id:<id>;request-id:<rid>;ts:<ts>;`. Timing-safe compare. Sin secret en prod → 503. Sin secret en dev → warn + permite.
 
 ---
 

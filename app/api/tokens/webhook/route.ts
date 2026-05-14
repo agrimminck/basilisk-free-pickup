@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tokenPurchases } from "@/db/schema";
 import { addTokens } from "@/lib/tokens";
+import { verifyMPSignature } from "@/lib/mp-signature";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!body?.type || !body?.data?.id) {
     return NextResponse.json({ received: true });
+  }
+
+  // MP webhook signature verification (HMAC SHA256).
+  const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 503 }
+      );
+    }
+    console.warn(
+      "[mp-webhook] MERCADOPAGO_WEBHOOK_SECRET not set; skipping signature verification (dev only)"
+    );
+  } else {
+    const valid = verifyMPSignature({
+      signatureHeader: request.headers.get("x-signature"),
+      requestId: request.headers.get("x-request-id"),
+      dataId: String(body.data.id),
+      secret: webhookSecret,
+    });
+    if (!valid) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
   }
 
   const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
