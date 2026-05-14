@@ -172,6 +172,7 @@ Script: `scripts/seed.ts` — ejecutar con `npx tsx scripts/seed.ts`
 | Archivo | Rol |
 |---------|-----|
 | `lib/tokens.ts` | Lógica tokens: FREE_MATCHES_PER_MONTH, TOKEN_PRICE_CLP, spendMatchToken, addTokens, recalculateAverageRating |
+| `lib/clustering.ts` | clusterItems puro (lat/lng round 3 dec). Extraído de `components/map.tsx` para test. |
 | `lib/data.ts` | Constantes UI: CATEGORIES, CITIES. Re-exporta FREE_MATCHES_PER_MONTH + TOKEN_PRICE_CLP desde tokens.ts |
 | `lib/types.ts` | Tipos DB-aligned: Profile, Item, Match, Review, TokenBalance |
 | `lib/auth.ts` | Better Auth server config + drizzle adapter + databaseHook crea profile en registro |
@@ -201,6 +202,28 @@ npm run db:push        # drizzle-kit push
 npm run db:studio      # drizzle-kit studio
 npx tsx scripts/seed.ts  # seed prod (borra y re-inserta todo)
 ```
+
+---
+
+## Tests
+
+Stack: **Vitest 4 + RTL + jsdom**. Config: `vitest.config.ts`. Setup: `tests/setup.ts`. Comandos: `npm test`, `npm run test:watch`, `npm run test:coverage`.
+
+**42 tests / 5 archivos** (Fase 1 baseline):
+
+| Archivo | Cubre |
+|---------|-------|
+| `lib/clustering.test.ts` | clusterItems: NaN/Infinity skip, mismo bucket 3-dec, keys estables, empty |
+| `lib/tokens.test.ts` | spendMatchToken: free→token→reject, reset boundary UTC mes/año, canSpendMatchToken |
+| `app/api/matches/route.test.ts` | POST match: 401/400/402, self-match, token debit AFTER insert (flag) |
+| `app/api/reviews/route.test.ts` | POST review: 401/400/403/409, bounds rating 1-5, recalc avg, self-review, match completed gate |
+| `app/api/tokens/webhook/route.test.ts` | MP IPN: idempotency completed, approved→credit, rejected→failed, MP API fail silent, race flag |
+
+DB: mocks in-memory (Drizzle + auth). Real Neon test schema pendiente fase 2.
+
+**Bugs flagged en tests** (documentados, no fixed):
+- `matches/route.ts`: match insert + spendMatchToken NO atómicos. Si spend lanza tras insert → match huérfano. Refactor: envolver en `db.transaction`.
+- `tokens/webhook`: check-then-act sin row lock. Dos IPN approved concurrentes podrían pasar el guard `status !== 'completed'` y doble-creditar. Mitigación: `SELECT ... FOR UPDATE` o constraint único en `mp_payment_id`.
 
 ---
 
