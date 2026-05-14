@@ -96,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     return NextResponse.json({ received: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Webhook error:", err);
     return NextResponse.json({ received: true });
   }

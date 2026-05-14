@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { clusterItems } from "../lib/clustering";
 
 export interface MapItem {
   id: string;
@@ -12,13 +13,6 @@ export interface MapItem {
   lng: number;
   status: string;
   neighborhood?: string;
-}
-
-interface Cluster {
-  key: string;
-  lat: number;
-  lng: number;
-  items: MapItem[];
 }
 
 interface MapProps {
@@ -40,25 +34,6 @@ function buildClusterIcon(count: number): L.DivIcon {
   });
 }
 
-function clusterItems(items: MapItem[]): Cluster[] {
-  const clusterMap = new globalThis.Map<string, Cluster>();
-
-  for (const item of items) {
-    const roundedLat = Math.round(item.lat * 1000) / 1000;
-    const roundedLng = Math.round(item.lng * 1000) / 1000;
-    const key = `${roundedLat},${roundedLng}`;
-
-    const existing = clusterMap.get(key);
-    if (existing) {
-      existing.items.push(item);
-    } else {
-      clusterMap.set(key, { key, lat: roundedLat, lng: roundedLng, items: [item] });
-    }
-  }
-
-  return Array.from(clusterMap.values());
-}
-
 export default function Map(props: MapProps) {
   const { items, center, zoom = 14, height = "500px" } = props;
   const [isDark, setIsDark] = useState(false);
@@ -76,15 +51,11 @@ export default function Map(props: MapProps) {
     return () => observer.disconnect();
   }, []);
 
+  const clusters = useMemo(() => clusterItems(items), [items]);
   const validItems = useMemo(
-    () =>
-      items.filter(
-        (item) => typeof item.lat === "number" && typeof item.lng === "number"
-      ),
-    [items]
+    () => clusters.flatMap((c) => c.items),
+    [clusters]
   );
-
-  const clusters = useMemo(() => clusterItems(validItems), [validItems]);
 
   const mapCenter: [number, number] =
     center ?? (validItems.length > 0 ? [validItems[0].lat, validItems[0].lng] : SANTIAGO_CENTRO);
