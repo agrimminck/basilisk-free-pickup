@@ -4,7 +4,7 @@ import { eq, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { matches, profiles, items } from "@/db/schema";
-import { canSpendMatchToken, spendMatchToken } from "@/lib/tokens";
+import { canSpendMatchToken, spendTokenAndCreateMatch } from "@/lib/tokens";
 
 export async function GET(): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -98,23 +98,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const [match] = await db
-    .insert(matches)
-    .values({
-      requesterId: requesterProfile.id,
-      recipientId: body.recipientId,
-      itemId: body.itemId ?? null,
-      matchType: body.matchType,
-      status: "pending",
-      tokenCost: 1,
-    })
-    .returning();
-
-  await spendMatchToken(
-    requesterProfile.id,
-    match.id,
-    `Match #${match.id} con ${recipientProfile.fullName}`
-  );
+  const { match } = await spendTokenAndCreateMatch({
+    requesterId: requesterProfile.id,
+    recipientId: body.recipientId,
+    recipientFullName: recipientProfile.fullName,
+    itemId: body.itemId ?? null,
+    matchType: body.matchType,
+  });
 
   return NextResponse.json(match, { status: 201 });
 }

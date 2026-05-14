@@ -33,14 +33,40 @@ const state: {
   nextMatchId: 1,
 };
 
-const spendCalls: Array<{ profileId: string; matchId: number }> = [];
+const spendCalls: Array<{ requesterId: string; recipientId: string }> = [];
 
 vi.mock("../../../lib/tokens", () => ({
   canSpendMatchToken: vi.fn(async (_id: string) => true),
-  spendMatchToken: vi.fn(async (profileId: string, matchId: number) => {
-    spendCalls.push({ profileId, matchId });
-    return { usedFree: true };
-  }),
+  spendTokenAndCreateMatch: vi.fn(
+    async (params: {
+      requesterId: string;
+      recipientId: string;
+      recipientFullName: string;
+      itemId: number | null;
+      matchType: string;
+    }) => {
+      // Simulates atomic tx: if the inner insert is rigged to fail, the
+      // whole call throws and NOTHING is persisted.
+      if (state.matchInsertShouldFail) {
+        throw new Error("tx rolled back: insert failed");
+      }
+      spendCalls.push({
+        requesterId: params.requesterId,
+        recipientId: params.recipientId,
+      });
+      const m = {
+        id: state.nextMatchId++,
+        requesterId: params.requesterId,
+        recipientId: params.recipientId,
+        itemId: params.itemId,
+        matchType: params.matchType,
+        status: "pending",
+        tokenCost: 1,
+      };
+      state.matches.push(m);
+      return { match: m, usedFree: true };
+    }
+  ),
 }));
 
 // Capture which table is being inserted/queried.
@@ -135,6 +161,7 @@ describe("POST /api/matches", () => {
     state.nextMatchId = 1;
     spendCalls.length = 0;
     session.user = { id: "u1" };
+    vi.clearAllMocks();
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -169,7 +196,7 @@ describe("POST /api/matches", () => {
     expect(res.status).toBe(400);
   });
 
-  it("creates match then spends token (token debit AFTER insert)", async () => {
+  it("creates match atomically via spendTokenAndCreateMatch", async () => {
     state.profilesByUserId["u1"] = { id: "p1", fullName: "Req" };
     state.profilesById["p2"] = { id: "p2", fullName: "Rec", tokensBalance: 0, freeMatchesUsed: 0, freeMatchesResetAt: null };
     const { POST } = await loadRoute();
@@ -177,22 +204,29 @@ describe("POST /api/matches", () => {
     expect(res.status).toBe(201);
     expect(state.matches).toHaveLength(1);
     expect(spendCalls).toHaveLength(1);
-    expect(spendCalls[0].matchId).toBe(state.matches[0].id);
+    expect(spendCalls[0].requesterId).toBe("p1");
+    expect(spendCalls[0].recipientId).toBe("p2");
   });
 
-  it("BUG FLAG: if match insert succeeds but spendMatchToken throws, match row already exists (no rollback)", async () => {
-    // This documents the current non-atomic behavior. Refactor target: wrap in tx.
+  it("atomic: if tx fails, NO match persisted AND NO token consumed", async () => {
     state.profilesByUserId["u1"] = { id: "p1", fullName: "Req" };
     state.profilesById["p2"] = { id: "p2", fullName: "Rec", tokensBalance: 0, freeMatchesUsed: 0, freeMatchesResetAt: null };
-    const tokens = await import("../../../lib/tokens");
-    (tokens.spendMatchToken as unknown as { mockRejectedValueOnce: (e: Error) => void }).mockRejectedValueOnce(
-      new Error("DB blew up after insert")
-    );
+    state.matchInsertShouldFail = true;
     const { POST } = await loadRoute();
     await expect(
       POST(makeRequest({ recipientId: "p2", matchType: "donante_fletero" }))
     ).rejects.toThrow();
-    // Orphan match exists — flagging the inconsistency.
-    expect(state.matches).toHaveLength(1);
+    // Rollback verified: no orphan match, no recorded spend.
+    expect(state.matches).toHaveLength(0);
+    expect(spendCalls).toHaveLength(0);
+  });
+
+  it("atomic: spendTokenAndCreateMatch is the single entry point (route does NOT do raw insert+spend)", async () => {
+    state.profilesByUserId["u1"] = { id: "p1", fullName: "Req" };
+    state.profilesById["p2"] = { id: "p2", fullName: "Rec", tokensBalance: 0, freeMatchesUsed: 0, freeMatchesResetAt: null };
+    const tokens = await import("../../../lib/tokens");
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ recipientId: "p2", matchType: "donante_fletero" }));
+    expect(tokens.spendTokenAndCreateMatch).toHaveBeenCalledTimes(1);
   });
 });
